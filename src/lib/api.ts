@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AppSettings,
+  AppError,
   CaptureState,
   CaptureSummary,
   FirmwareProgress,
@@ -31,6 +32,15 @@ export const api = {
 
 export function onEvent<T>(name: string, callback: (payload: T) => void): Promise<UnlistenFn> {
   return listen<T>(name, (event) => callback(event.payload));
+}
+
+export function formatAppError(error: unknown, serialPermissionMessage: string): string {
+  if (typeof error === 'object' && error !== null) {
+    const appError = error as Partial<AppError>;
+    if (appError.code === 'SERIAL_PERMISSION_DENIED') return serialPermissionMessage;
+    if (typeof appError.message === 'string') return appError.message;
+  }
+  return String(error);
 }
 
 export type { UnlistenFn };

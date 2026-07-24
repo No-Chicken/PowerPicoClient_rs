@@ -7,6 +7,9 @@ export const zh = {
     refresh: '刷新', connect: '连接', disconnect: '断开', clear: '清除', import: '导入',
     export: '导出', cancel: '取消', browse: '选择文件', start: '开始', none: '无', error: '错误',
   },
+  errors: {
+    serialPermission: '没有串口访问权限。Debian/Ubuntu 请将当前用户加入 dialout 组，Arch Linux 请加入 uucp 组，然后注销并重新登录。',
+  },
   waveform: {
     title: '实时波形', subtitle: '采集、查看并导出 PowerPico 测量数据', selectDevice: '选择串口设备',
     voltage: '电压', current: '电流', avgVoltage: '平均电压', peakVoltage: '峰值电压',
@@ -43,6 +46,9 @@ export const en = {
   common: {
     refresh: 'Refresh', connect: 'Connect', disconnect: 'Disconnect', clear: 'Clear', import: 'Import',
     export: 'Export', cancel: 'Cancel', browse: 'Browse', start: 'Start', none: 'None', error: 'Error',
+  },
+  errors: {
+    serialPermission: 'Serial access was denied. Add your user to dialout on Debian/Ubuntu or uucp on Arch Linux, then sign out and back in.',
   },
   waveform: {
     title: 'Live waveform', subtitle: 'Capture, inspect and export PowerPico measurements', selectDevice: 'Select serial device',

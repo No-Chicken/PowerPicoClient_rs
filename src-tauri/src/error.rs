@@ -7,6 +7,10 @@ pub enum CoreError {
     DeviceNotFound(String),
     #[error("serial device is busy")]
     DeviceBusy,
+    #[error(
+        "permission denied for serial device {0}; add your user to the dialout group on Debian/Ubuntu or the uucp group on Arch Linux, then sign out and back in"
+    )]
+    SerialPermissionDenied(String),
     #[error("no recording is available")]
     NoRecording,
     #[error("invalid recording: {0}")]
@@ -31,6 +35,19 @@ impl From<serialport::Error> for CoreError {
     }
 }
 
+impl CoreError {
+    pub fn from_serial_open(path: &str, error: serialport::Error) -> Self {
+        if matches!(
+            error.kind(),
+            serialport::ErrorKind::Io(std::io::ErrorKind::PermissionDenied)
+        ) {
+            Self::SerialPermissionDenied(path.into())
+        } else {
+            Self::Serial(error.to_string())
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppError {
@@ -43,6 +60,7 @@ impl From<CoreError> for AppError {
         let code = match error {
             CoreError::DeviceNotFound(_) => "DEVICE_NOT_FOUND",
             CoreError::DeviceBusy => "DEVICE_BUSY",
+            CoreError::SerialPermissionDenied(_) => "SERIAL_PERMISSION_DENIED",
             CoreError::NoRecording => "NO_RECORDING",
             CoreError::InvalidRecording(_) => "INVALID_RECORDING",
             CoreError::Cancelled => "CANCELLED",

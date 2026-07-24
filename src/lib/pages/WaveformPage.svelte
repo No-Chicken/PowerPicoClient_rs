@@ -6,7 +6,7 @@
     Crosshair, FolderInput, FolderOutput, Radio, RefreshCw, RotateCcw, Trash2, Usb, Unplug, X,
   } from '@lucide/svelte';
   import uPlot from 'uplot';
-  import { api, onEvent, type UnlistenFn } from '../api';
+  import { api, formatAppError, onEvent, type UnlistenFn } from '../api';
   import { formatCurrent, formatPower, metricById } from '../metrics';
   import { createRefreshScheduler } from '../refreshScheduler';
   import type {
@@ -52,6 +52,10 @@
   let viewRevision = 0;
   const refreshScheduler = createRefreshScheduler(() => void refreshPlot(), 34);
 
+  function errorMessage(error: unknown) {
+    return formatAppError(error, $_('errors.serialPermission'));
+  }
+
   function emptySummary(): CaptureSummary {
     return {
       pointCount: 0, duration: 0, latestVoltage: 0, voltageAverage: 0, voltagePeak: 0,
@@ -71,7 +75,7 @@
     try {
       devices = await api.listDevices();
       if (!devices.some((device) => device.id === selectedDevice)) selectedDevice = '';
-    } catch (error) { notify(String(error), 'error'); }
+    } catch (error) { notify(errorMessage(error), 'error'); }
   }
 
   async function toggleCapture() {
@@ -85,7 +89,7 @@
         timeViewport = { min: 0, max: 10 };
         state = await api.startCapture(selectedDevice);
       }
-    } catch (error) { notify(String(error), 'error'); }
+    } catch (error) { notify(errorMessage(error), 'error'); }
   }
 
   async function importRecording() {
@@ -102,7 +106,7 @@
       clearSelection();
       await refreshPlot();
       notify($_('waveform.imported'), 'success');
-    } catch (error) { notify(String(error), 'error'); }
+    } catch (error) { notify(errorMessage(error), 'error'); }
   }
 
   async function exportRecording() {
@@ -111,7 +115,7 @@
     try {
       await api.exportRecording(directory);
       notify($_('waveform.exportSuccess'), 'success');
-    } catch (error) { notify(String(error), 'error'); }
+    } catch (error) { notify(errorMessage(error), 'error'); }
   }
 
   async function clearRecords() {
@@ -128,7 +132,7 @@
       currentSeries = emptySeries();
       clearSelection();
       updateChart(currentSeries);
-    } catch (error) { notify(String(error), 'error'); }
+    } catch (error) { notify(errorMessage(error), 'error'); }
   }
 
   function liveRange(): NumericRange {
@@ -459,7 +463,7 @@
       }
     }));
     unlisteners.push(await onEvent('capture-data-ready', scheduleRefresh));
-    unlisteners.push(await onEvent<string>('device-disconnected', (message) => notify(message, 'error')));
+    unlisteners.push(await onEvent<import('../types').AppError>('device-disconnected', (error) => notify(errorMessage(error), 'error')));
     await refreshPlot();
   });
 

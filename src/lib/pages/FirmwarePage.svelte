@@ -3,7 +3,7 @@
   import { _ } from 'svelte-i18n';
   import { open } from '@tauri-apps/plugin-dialog';
   import { FileCode2, RefreshCw, Rocket, ShieldAlert, XCircle } from '@lucide/svelte';
-  import { api, onEvent, type UnlistenFn } from '../api';
+  import { api, formatAppError, onEvent, type UnlistenFn } from '../api';
   import type { FirmwareProgress, SerialDevice } from '../types';
 
   export let notify: (message: string, tone?: 'info' | 'error' | 'success') => void;
@@ -14,7 +14,8 @@
   let unlisteners: UnlistenFn[] = [];
   $: busy = !['idle', 'completed', 'cancelled', 'failed'].includes(progress.stage);
 
-  async function refreshDevices() { try { devices = await api.listDevices(); } catch (error) { notify(String(error), 'error'); } }
+  function errorMessage(error: unknown) { return formatAppError(error, $_('errors.serialPermission')); }
+  async function refreshDevices() { try { devices = await api.listDevices(); } catch (error) { notify(errorMessage(error), 'error'); } }
   async function chooseFile() {
     const path = await open({ multiple: false, filters: [{ name: 'Firmware', extensions: ['bin'] }] });
     if (typeof path === 'string') firmwarePath = path;
@@ -22,9 +23,9 @@
   async function flash() {
     if (!selectedDevice) return notify($_('waveform.noDevice'), 'error');
     if (!firmwarePath) return notify($_('firmware.noFile'), 'error');
-    try { await api.flashFirmware(selectedDevice, firmwarePath); } catch (error) { notify(String(error), 'error'); }
+    try { await api.flashFirmware(selectedDevice, firmwarePath); } catch (error) { notify(errorMessage(error), 'error'); }
   }
-  async function cancel() { try { await api.cancelFlash(); } catch (error) { notify(String(error), 'error'); } }
+  async function cancel() { try { await api.cancelFlash(); } catch (error) { notify(errorMessage(error), 'error'); } }
 
   onMount(async () => {
     await refreshDevices();

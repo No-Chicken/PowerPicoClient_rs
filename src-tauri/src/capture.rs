@@ -102,7 +102,8 @@ impl CaptureManager {
             let result = (|| -> CoreResult<()> {
                 let mut port = serialport::new(&device.system_path, 1_500_000)
                     .timeout(Duration::from_millis(20))
-                    .open()?;
+                    .open()
+                    .map_err(|error| CoreError::from_serial_open(&device.system_path, error))?;
                 port.clear(serialport::ClearBuffer::Input)?;
                 let mut writer = RecordWriter::create(&records_dir)?;
                 *record_path.write() = Some(writer.l0_path.clone());
@@ -188,7 +189,8 @@ impl CaptureManager {
                     error: None,
                 },
                 Err(error) => {
-                    app.emit("device-disconnected", error.to_string()).ok();
+                    let app_error = crate::error::AppError::from(error);
+                    app.emit("device-disconnected", &app_error).ok();
                     CaptureState {
                         status: CaptureStatus::Error,
                         device_id: Some(device_id),
@@ -196,7 +198,7 @@ impl CaptureManager {
                             .read()
                             .as_ref()
                             .map(|path| path.to_string_lossy().into_owned()),
-                        error: Some(error.to_string()),
+                        error: Some(app_error.message),
                     }
                 }
             };

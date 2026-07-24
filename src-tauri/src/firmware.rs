@@ -69,12 +69,23 @@ impl FirmwareManager {
                     .into_iter()
                     .map(|item| item.system_path)
                     .collect();
-                if let Ok(mut app_port) = serialport::new(&original.system_path, 1_500_000)
+                match serialport::new(&original.system_path, 1_500_000)
                     .timeout(Duration::from_millis(200))
                     .open()
                 {
-                    app_port.write_all(b"update\r\n")?;
-                    app_port.flush()?;
+                    Ok(mut app_port) => {
+                        app_port.write_all(b"update\r\n")?;
+                        app_port.flush()?;
+                    }
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            serialport::ErrorKind::Io(std::io::ErrorKind::PermissionDenied)
+                        ) =>
+                    {
+                        return Err(CoreError::from_serial_open(&original.system_path, error));
+                    }
+                    Err(_) => {}
                 }
                 emit(
                     FirmwareStage::Rebooting,
@@ -102,7 +113,8 @@ impl FirmwareManager {
                 };
                 let mut port = serialport::new(&boot.system_path, 115_200)
                     .timeout(Duration::from_millis(100))
-                    .open()?;
+                    .open()
+                    .map_err(|error| CoreError::from_serial_open(&boot.system_path, error))?;
                 emit(
                     FirmwareStage::Handshaking,
                     5,

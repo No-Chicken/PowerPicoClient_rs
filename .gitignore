@@ -3,6 +3,7 @@ node_modules/
 dist/
 .vite/
 coverage/
+artifacts/
 
 # Rust / Tauri 生成文件
 src-tauri/target/
@@ -22,4 +23,3 @@ src-tauri/gen/schemas/
 *.swo
 .DS_Store
 Thumbs.db
-

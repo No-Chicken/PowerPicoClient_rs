@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { Activity, Cpu, Settings as SettingsIcon, Zap } from '@lucide/svelte';
-  import { api, onEvent, type UnlistenFn } from './lib/api';
+  import { api, formatAppError, onEvent, type UnlistenFn } from './lib/api';
   import { setLocale } from './lib/i18n';
   import { defaultWaveformMetrics } from './lib/metricLayout';
   import type { AppSettings } from './lib/types';
@@ -46,7 +46,7 @@
       unlistenCapture = await onEvent<{ status: string }>('capture-state-changed', (next) => { connected = next.status === 'capturing'; });
       const media = matchMedia('(prefers-color-scheme: dark)');
       media.addEventListener('change', () => { if (settings.theme === 'system') applyTheme('system'); });
-    } catch (error) { notify(String(error), 'error'); }
+    } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
   });
   onDestroy(() => unlistenCapture?.());
 </script>
