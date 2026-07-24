@@ -40,7 +40,7 @@ struct FirmwareResponse {
 fn client() -> CoreResult<reqwest::blocking::Client> {
     reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(20))
-        .user_agent("PowerPico-Client/0.1.1")
+        .user_agent(concat!("PowerPico-Client/", env!("CARGO_PKG_VERSION")))
         .build()
         .map_err(|error| CoreError::Other(error.to_string()))
 }
@@ -243,7 +243,7 @@ mod tests {
 
     #[test]
     fn semantic_versions_ignore_v_prefix() {
-        let current = Version::parse("0.1.1").unwrap();
+        let current = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
         let latest = Version::parse("v0.2.0".trim_start_matches('v')).unwrap();
         assert!(latest > current);
     }

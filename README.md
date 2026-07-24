@@ -2,12 +2,12 @@
   <h1 align="center">PowerPico Client</h1>
   <p align="center">面向 PowerPico 的跨平台数据采集、波形分析与固件升级客户端</p>
 
-  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.1.1-blue" alt="Version 0.1.1"></a>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.1.2-blue" alt="Version 0.1.2"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
   <img src="https://img.shields.io/badge/Tauri-v2-24C8DB" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Svelte-v5-FF3E00" alt="Svelte v5">
   <img src="https://img.shields.io/badge/Core-Rust-DEA584" alt="Rust">
-  <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux-informational" alt="macOS and Linux">
+  <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux%20%7C%20Windows-informational" alt="macOS, Linux and Windows">
   <br>
   <a href="https://github.com/No-Chicken/PowerPicoClient_rs/stargazers"><img src="https://img.shields.io/github/stars/No-Chicken/PowerPicoClient_rs.svg" alt="GitHub stars"></a>
 </div>
@@ -16,7 +16,7 @@
 
 ## 📖 项目简介
 
-**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，面向 macOS、Linux 和 Windows，提供高速数据采集、实时波形、精确区间分析、记录导入导出和固件升级能力。
+**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，提供高速数据采集、实时波形、精确区间分析、记录导入导出和固件升级能力。当前已完成 macOS 和 Linux 适配，Windows 为项目支持的目标平台，当前版本尚未完成实现。
 
 <p align="center">
   <a href="https://github.com/No-Chicken/Power-Pico">Power-Pico 主项目</a> |
@@ -38,6 +38,17 @@
 - **固件升级**：支持官方固件查询与缓存、自定义 BIN、Bootloader 重新枚举、YMODEM 刷写、进度显示和取消。
 - **跨平台体验**：支持简体中文、繁体中文、英语、日语、系统语言模式，以及主题、界面缩放和渲染质量设置。
 - **更新与维护**：支持 GitHub Releases 更新检查、内部临时记录自动清理和平台滚动日志。
+
+---
+
+## 🖼️ 功能展示
+
+<p align="center">
+  <img width="48%" src="./docs/images/powerpico-firmware.png" alt="PowerPico Client 固件升级界面">
+  <img width="48%" src="./docs/images/powerpico-settings.png" alt="PowerPico Client 设置界面">
+</p>
+
+<p align="center"><sub>官方/自定义固件升级与多语言、界面缩放、波形渲染等设置</sub></p>
 
 ---
 
@@ -83,10 +94,11 @@ chmod +x PowerPico-Client_<版本>_amd64.AppImage
 | :--- | :--- | :--- | :--- |
 | macOS 11+ | Apple Silicon ARM64 | DMG | 支持，未签名且未公证 |
 | Ubuntu / Debian Linux | x86_64 | DEB、AppImage | 支持 |
+| Windows | x86_64 | 暂无 | 项目支持的目标平台，当前版本尚未实现 |
 
 </div>
 
-Windows、macOS Intel、Linux ARM64 和 RPM 暂不支持，也不属于当前发布目标。
+Windows 已纳入项目支持范围，但当前版本尚未完成平台适配、构建与安装包发布。macOS Intel、Linux ARM64 和 RPM 当前不支持，也不属于当前发布目标。
 
 DEB 包基于 Ubuntu 22.04 构建，理论上可在 Debian 11+、Ubuntu 22.04+、Linux Mint 21+ 等系统上安装。AppImage 可在大多数 x86_64 Linux 上运行，但不保证兼容性。
 ### Linux 串口权限
