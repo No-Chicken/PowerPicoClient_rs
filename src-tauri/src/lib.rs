@@ -2,6 +2,7 @@ mod capture;
 mod device;
 mod error;
 mod firmware;
+mod network;
 mod protocol;
 mod settings;
 mod storage;
@@ -15,13 +16,19 @@ use tauri::{Manager, State};
 use capture::CaptureManager;
 use error::{AppError, CommandResult, CoreError};
 use firmware::FirmwareManager;
+use network::DownloadManager;
 use settings::SettingsStore;
-use types::{AppSettings, CaptureState, CaptureSummary, PointReading, RenderSeries, SerialDevice};
+use types::{
+    AppSettings, CaptureState, CaptureSummary, ClientUpdateInfo, OfficialFirmwareInfo,
+    PointReading, RangeStatistics, RenderSeries, SerialDevice,
+};
 
 pub struct AppState {
     capture: CaptureManager,
     firmware: FirmwareManager,
+    downloads: DownloadManager,
     settings: SettingsStore,
+    app_data_dir: PathBuf,
     records_dir: PathBuf,
 }
 
@@ -79,6 +86,18 @@ fn get_stats(
 }
 
 #[tauri::command]
+fn get_range_stats(
+    state: State<'_, AppState>,
+    start: f64,
+    end: f64,
+) -> CommandResult<RangeStatistics> {
+    state
+        .capture
+        .range_statistics(start, end)
+        .map_err(command_error)
+}
+
+#[tauri::command]
 fn get_point_at(state: State<'_, AppState>, time_seconds: f64) -> CommandResult<PointReading> {
     let path = state.capture.record_path().map_err(command_error)?;
     storage::point_at(&path, time_seconds).map_err(command_error)
@@ -128,6 +147,67 @@ fn cancel_flash(state: State<'_, AppState>) {
 }
 
 #[tauri::command]
+async fn get_official_firmware_info(
+    state: State<'_, AppState>,
+) -> CommandResult<OfficialFirmwareInfo> {
+    let app_data = state.app_data_dir.clone();
+    let settings = state.settings.get();
+    tauri::async_runtime::spawn_blocking(move || {
+        network::fetch_official_firmware_info(
+            &app_data,
+            settings.local_firmware_version,
+            settings.local_firmware_release_date,
+        )
+    })
+    .await
+    .map_err(|error| CoreError::Other(error.to_string()))?
+    .map_err(command_error)
+}
+
+#[tauri::command]
+fn download_official_firmware(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    url: String,
+    version: String,
+    release_date: String,
+) -> CommandResult<()> {
+    state
+        .downloads
+        .start(
+            app,
+            url,
+            version,
+            release_date,
+            state.app_data_dir.clone(),
+            state.settings.clone(),
+        )
+        .map_err(command_error)
+}
+
+#[tauri::command]
+fn cancel_firmware_download(state: State<'_, AppState>) {
+    state.downloads.cancel();
+}
+
+#[tauri::command]
+async fn check_client_update() -> CommandResult<ClientUpdateInfo> {
+    tauri::async_runtime::spawn_blocking(|| network::check_client_update(env!("CARGO_PKG_VERSION")))
+        .await
+        .map_err(|error| CoreError::Other(error.to_string()))?
+        .map_err(command_error)
+}
+
+#[tauri::command]
+fn external_links() -> serde_json::Value {
+    serde_json::json!({
+        "help": network::HELP_URL,
+        "feedback": network::FEEDBACK_URL,
+        "firmwareReleaseNotes": network::RELEASE_NOTES_URL,
+    })
+}
+
+#[tauri::command]
 fn get_settings(state: State<'_, AppState>) -> AppSettings {
     state.settings.get()
 }
@@ -144,6 +224,7 @@ fn update_settings(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             let app_data = app.path().app_data_dir()?;
             let cache = app.path().app_cache_dir()?;
@@ -151,6 +232,14 @@ pub fn run() {
             fs::create_dir_all(&app_data)?;
             fs::create_dir_all(&cache)?;
             fs::create_dir_all(&logs)?;
+            let records_dir = cache.join("records");
+            fs::create_dir_all(&records_dir)?;
+            if let Err(error) = storage::clean_stale_recordings(
+                &records_dir,
+                std::time::Duration::from_secs(3 * 24 * 60 * 60),
+            ) {
+                tracing::warn!("failed to clean stale recordings: {error}");
+            }
             let file_appender = tracing_appender::rolling::daily(&logs, "powerpico.log");
             let _ = tracing_subscriber::fmt()
                 .with_writer(file_appender)
@@ -161,8 +250,10 @@ pub fn run() {
             app.manage(AppState {
                 capture: CaptureManager::default(),
                 firmware: FirmwareManager::default(),
+                downloads: DownloadManager::default(),
                 settings,
-                records_dir: cache.join("records"),
+                app_data_dir: app_data,
+                records_dir,
             });
             Ok(())
         })
@@ -173,12 +264,18 @@ pub fn run() {
             get_capture_state,
             get_render_data,
             get_stats,
+            get_range_stats,
             get_point_at,
             clear_records,
             import_recording,
             export_recording,
             flash_firmware,
             cancel_flash,
+            get_official_firmware_info,
+            download_official_firmware,
+            cancel_firmware_download,
+            check_client_update,
+            external_links,
             get_settings,
             update_settings,
         ])

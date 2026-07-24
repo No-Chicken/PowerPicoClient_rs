@@ -50,21 +50,18 @@ impl FirmwareManager {
         let cancel = Arc::clone(&self.cancel);
         cancel.store(false, Ordering::SeqCst);
         let handle = thread::spawn(move || {
-            let emit = |stage, percent, message: String| {
+            let emit = |stage, percent, message_key: &str, detail: Option<String>| {
                 let progress = FirmwareProgress {
                     stage,
                     percent,
-                    message,
+                    message_key: message_key.into(),
+                    detail,
                 };
                 app.emit("firmware-progress", &progress).ok();
                 progress
             };
             let result = (|| -> CoreResult<()> {
-                emit(
-                    FirmwareStage::Connecting,
-                    0,
-                    "Connecting to PowerPico…".into(),
-                );
+                emit(FirmwareStage::Connecting, 0, "connecting", None);
                 let previous_paths: Vec<String> = device::list_devices()?
                     .into_iter()
                     .map(|item| item.system_path)
@@ -87,16 +84,13 @@ impl FirmwareManager {
                     }
                     Err(_) => {}
                 }
-                emit(
-                    FirmwareStage::Rebooting,
-                    2,
-                    "Rebooting into bootloader…".into(),
-                );
+                emit(FirmwareStage::Rebooting, 2, "rebooting", None);
                 thread::sleep(Duration::from_secs(1));
                 emit(
                     FirmwareStage::SearchingBootloader,
                     4,
-                    "Searching for bootloader…".into(),
+                    "searchingBootloader",
+                    None,
                 );
                 let started = Instant::now();
                 let boot = loop {
@@ -115,11 +109,7 @@ impl FirmwareManager {
                     .timeout(Duration::from_millis(100))
                     .open()
                     .map_err(|error| CoreError::from_serial_open(&boot.system_path, error))?;
-                emit(
-                    FirmwareStage::Handshaking,
-                    5,
-                    "Waiting for bootloader handshake…".into(),
-                );
+                emit(FirmwareStage::Handshaking, 5, "handshaking", None);
                 let started = Instant::now();
                 let mut text = Vec::new();
                 let mut buffer = [0u8; 512];
@@ -151,7 +141,7 @@ impl FirmwareManager {
                 thread::sleep(Duration::from_millis(200));
                 port.clear(serialport::ClearBuffer::Input)?;
                 port.write_all(b"1")?;
-                emit(FirmwareStage::Uploading, 6, "Uploading firmware…".into());
+                emit(FirmwareStage::Uploading, 6, "uploading", None);
                 let app_for_progress = app.clone();
                 ymodem::send_file(
                     &mut *port,
@@ -165,17 +155,14 @@ impl FirmwareManager {
                                 FirmwareProgress {
                                     stage: FirmwareStage::Uploading,
                                     percent,
-                                    message: "Uploading firmware…".into(),
+                                    message_key: "uploading".into(),
+                                    detail: None,
                                 },
                             )
                             .ok();
                     },
                 )?;
-                emit(
-                    FirmwareStage::Finishing,
-                    98,
-                    "Starting updated firmware…".into(),
-                );
+                emit(FirmwareStage::Finishing, 98, "finishing", None);
                 thread::sleep(Duration::from_millis(500));
                 port.write_all(b"3")?;
                 Ok(())
@@ -184,17 +171,20 @@ impl FirmwareManager {
                 Ok(()) => FirmwareProgress {
                     stage: FirmwareStage::Completed,
                     percent: 100,
-                    message: "Firmware updated successfully".into(),
+                    message_key: "completed".into(),
+                    detail: None,
                 },
                 Err(CoreError::Cancelled) => FirmwareProgress {
                     stage: FirmwareStage::Cancelled,
                     percent: 0,
-                    message: "Firmware update cancelled".into(),
+                    message_key: "cancelled".into(),
+                    detail: None,
                 },
                 Err(error) => FirmwareProgress {
                     stage: FirmwareStage::Failed,
                     percent: 0,
-                    message: error.to_string(),
+                    message_key: "failed".into(),
+                    detail: Some(error.to_string()),
                 },
             };
             app.emit("firmware-progress", &final_progress).ok();

@@ -1,17 +1,25 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { openUrl } from '@tauri-apps/plugin-opener';
   import {
     ArrowDown, ArrowUp, ChartNoAxesCombined, GripVertical, Languages,
-    MonitorCog, Palette, Plus, Scale, X,
+    CircleHelp, ExternalLink, MonitorCog, Palette, Plus, RefreshCw, Scale, X,
   } from '@lucide/svelte';
+  import { api, formatAppError } from '../api';
   import { metricById, metricCatalog } from '../metrics';
   import { addMetric as addMetricToLayout, moveMetric as moveMetricInLayout, removeMetric as removeMetricFromLayout, reorderMetric } from '../metricLayout';
-  import type { AppSettings, Language, MetricId, ThemeMode } from '../types';
+  import type { AppSettings, ExternalLinks, Language, MetricId, ThemeMode } from '../types';
 
   export let settings: AppSettings;
   export let update: (settings: AppSettings) => Promise<void>;
+  export let notify: (message: string, tone?: 'info' | 'error' | 'success') => void;
 
   let draggedMetric: MetricId | null = null;
+  let links: ExternalLinks | null = null;
+  let checkingUpdate = false;
+
+  onMount(async () => { links = await api.externalLinks(); });
 
   function themeChanged(event: Event) {
     void update({ ...settings, theme: (event.target as HTMLSelectElement).value as ThemeMode });
@@ -19,6 +27,22 @@
 
   function languageChanged(event: Event) {
     void update({ ...settings, language: (event.target as HTMLSelectElement).value as Language });
+  }
+
+  function settingChanged<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
+    void update({ ...settings, [key]: value });
+  }
+
+  async function checkUpdate() {
+    checkingUpdate = true;
+    try {
+      const result = await api.checkClientUpdate();
+      if (result.updateAvailable) {
+        notify(`${$_('settings.updateAvailable')}: ${result.latestVersion}`, 'info');
+        await openUrl(result.releaseUrl);
+      } else notify($_('settings.upToDate'), 'success');
+    } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
+    finally { checkingUpdate = false; }
   }
 
   function saveMetrics(waveformMetrics: MetricId[]) {
@@ -51,7 +75,15 @@
   <div class="group panel">
     <h2><Palette size={19}/>{$_('settings.appearance')}</h2>
     <div class="setting"><div class="label"><MonitorCog size={20}/><div><strong>{$_('settings.theme')}</strong><span>{$_(`settings.${settings.theme}`)}</span></div></div><select class="control" value={settings.theme} onchange={themeChanged}><option value="system">{$_('settings.system')}</option><option value="light">{$_('settings.light')}</option><option value="dark">{$_('settings.dark')}</option></select></div>
-    <div class="setting"><div class="label"><Languages size={20}/><div><strong>{$_('settings.language')}</strong><span>{settings.language === 'zh-CN' ? '简体中文' : 'English'}</span></div></div><select class="control" value={settings.language} onchange={languageChanged}><option value="zh-CN">简体中文</option><option value="en">English</option></select></div>
+    <div class="setting"><div class="label"><Languages size={20}/><div><strong>{$_('settings.language')}</strong><span>{settings.language}</span></div></div><select class="control" value={settings.language} onchange={languageChanged}><option value="auto">{$_('settings.system')}</option><option value="zh-CN">简体中文</option><option value="zh-HK">繁體中文</option><option value="en">English</option><option value="ja">日本語</option></select></div>
+    <div class="setting"><div class="label"><Scale size={20}/><div><strong>{$_('settings.uiScale')}</strong><span>{settings.uiScale ? `${settings.uiScale}%` : $_('settings.auto')}</span></div></div><select class="control" value={settings.uiScale} onchange={(event) => settingChanged('uiScale', Number((event.target as HTMLSelectElement).value) as AppSettings['uiScale'])}><option value="0">{$_('settings.auto')}</option>{#each [100,125,150,175,200] as scale}<option value={scale}>{scale}%</option>{/each}</select></div>
+    <div class="setting"><div class="label"><MonitorCog size={20}/><div><strong>{$_('settings.antiAliasing')}</strong></div></div><input type="checkbox" checked={settings.antiAliasing} onchange={(event) => settingChanged('antiAliasing', (event.target as HTMLInputElement).checked)}/></div>
+  </div>
+
+  <div class="group panel">
+    <h2><RefreshCw size={19}/>{$_('settings.update')}</h2>
+    <div class="setting"><div class="label"><RefreshCw size={20}/><div><strong>{$_('settings.checkAtStartup')}</strong></div></div><input type="checkbox" checked={settings.checkUpdateAtStartup} onchange={(event) => settingChanged('checkUpdateAtStartup', (event.target as HTMLInputElement).checked)}/></div>
+    <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.checkNow')}</strong></div></div><button class="secondary-button" onclick={checkUpdate} disabled={checkingUpdate}>{$_('settings.checkNow')}</button></div>
   </div>
 
   <div class="group panel metrics-setting">
@@ -93,7 +125,13 @@
     </div>
   </div>
 
-  <div class="group panel about"><h2><Scale size={19}/>{$_('settings.about')}</h2><p>{$_('settings.aboutText')}</p><code>PowerPico Client 0.1.0 · MIT</code></div>
+  <div class="group panel">
+    <h2><CircleHelp size={19}/>{$_('settings.help')}</h2>
+    <div class="setting"><div class="label"><CircleHelp size={20}/><div><strong>{$_('settings.openHelp')}</strong></div></div><button class="secondary-button" onclick={() => links && openUrl(links.help)}>{$_('common.open')}</button></div>
+    <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.provideFeedback')}</strong></div></div><button class="secondary-button" onclick={() => links && openUrl(links.feedback)}>{$_('common.open')}</button></div>
+  </div>
+
+  <div class="group panel about"><h2><Scale size={19}/>{$_('settings.about')}</h2><p>{$_('settings.aboutText')}</p><code>PowerPico Client 0.1.1 · GPL-3.0-only</code></div>
 </section>
 
 <style>

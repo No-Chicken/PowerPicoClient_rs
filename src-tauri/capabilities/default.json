@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Default desktop capabilities",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save"]
+  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save", "opener:allow-open-url"]
 }

@@ -1,118 +1,97 @@
 # PowerPico Client
 
-PowerPico Client 是基于 Tauri 2、Svelte 5 和 Rust 开发的开源跨平台桌面客户端，用于采集、查看和导出 PowerPico 测量数据，并支持设备固件升级。
+PowerPico Client 是使用 Tauri 2、Svelte 5 与 Rust 重写的 PowerPico 桌面客户端，面向 macOS 和 Linux，提供高速数据采集、波形分析、记录导入导出和固件升级。
 
-本仓库采用 MIT 许可证。原 Python/Qt 客户端仅作为协议与兼容性参考，不属于本仓库的授权范围。
+## 平台支持
 
-## 功能特性
+| 平台 | 架构 | 发布包 | 状态 |
+| --- | --- | --- | --- |
+| macOS 11+ | Apple Silicon ARM64 | DMG | 支持，当前未签名且未公证 |
+| Ubuntu/Debian Linux | x86_64 | DEB、AppImage | 支持 |
 
-- 跨平台串口设备发现，支持 macOS `/dev/cu.*` 以及 Linux `/dev/ttyACM*`、`/dev/ttyUSB*` 设备路径
-- 使用 Rust 实现 1.5 Mbps 数据采集与 PowerPico 二进制协议解析
-- 支持与旧版客户端兼容的 L0/Ln 记录文件及 CSV 导出
-- 实时显示电压、电流波形，时间轴、电压轴和电流轴可独立缩放与平移
-- 支持精确查看原始采样点，并锁定显示电压、电流和功率
-- 可持久化和重新排序的指标卡片，显示实时值、平均值、峰值、时长、计数和能量
-- 支持通过 YMODEM 本地刷写固件及重新发现引导加载器设备
-- 提供简体中文和英文界面，以及浅色、深色和跟随系统主题
-- 支持构建 macOS ARM64 应用、未签名 DMG，以及 Linux x86_64 DEB/AppImage 安装包
+Windows、macOS Intel、Linux ARM64 和 RPM 暂不支持，也不属于当前发布目标。
 
-## 技术栈
+## 已实现功能
 
-- Tauri 2
-- Svelte 5
-- TypeScript
-- Rust
-- Vite
-- pnpm
+- macOS `/dev/cu.*` 与 Linux `/dev/ttyACM*`、`/dev/ttyUSB*` 串口发现及稳定设备标识
+- Rust 实现的 1.5 Mbps 数据接收、PowerPico 协议解析和异常采样过滤
+- 与原客户端兼容的 L0/L1-L5 分级记录、LOD 波形读取、BIN/CSV 导入导出
+- 实时跟随、历史浏览、时间/电压/电流独立缩放和平移及精确原始采样点读取
+- 全局、最近 10 分钟、最近 1 分钟和最近 1 秒统计
+- 右键拖选区间分析，包括电压、电流、功率、时长、采样数和 mAh
+- 可排序、增删并持久化的实时指标卡片
+- 官方固件版本查询、下载和本地缓存，以及自定义 BIN 固件
+- Bootloader 重新枚举、YMODEM 刷写、进度显示和取消
+- 基于 GitHub Releases 的启动更新检查和手动更新检查
+- 简体中文、繁体中文、英语、日语和跟随系统语言
+- 浅色、深色、跟随系统主题，界面缩放和波形渲染质量设置
+- 内部临时记录自动清理、平台应用数据目录和滚动日志
 
-## 开发环境
+## 开发
 
-请先安装以下工具：
-
-- Rust 1.77.2 或更高版本
-- Node.js 20 或更高版本
-- pnpm 10 或更高版本
-
-Arch Linux 开发调试需要 Tauri、WebKitGTK 和串口设备发现所需的系统库：
-
-```bash
-sudo pacman -S --needed base-devel webkit2gtk-4.1 libappindicator-gtk3 librsvg systemd
-```
-
-安装依赖并启动开发模式：
+需要 Rust 1.77.2+、Node.js 20+ 和 pnpm 10+。
 
 ```bash
 pnpm install
 pnpm tauri dev
 ```
 
-Linux 日常开发以 Arch Linux 为主，直接运行 `pnpm tauri dev`，应用将访问宿主机串口设备。安装包不在 Arch Linux 上生成。
+Arch Linux 开发依赖：
+
+```bash
+sudo pacman -S --needed base-devel webkit2gtk-4.1 libappindicator-gtk3 librsvg systemd
+```
 
 ## 质量检查
-
-在项目根目录执行前端检查、测试和构建：
 
 ```bash
 pnpm check
 pnpm test
 pnpm build
-```
 
-检查 Rust 代码：
-
-```bash
 cd src-tauri
 cargo fmt --check
 cargo clippy -- -D warnings
 cargo test
 ```
 
-## 构建应用
+## 构建
 
-构建当前平台的安装包：
-
-```bash
-pnpm tauri build
-```
-
-构建未签名的 macOS DMG：
+macOS ARM64 未签名 DMG：
 
 ```bash
 pnpm tauri build --bundles dmg
 ```
 
-Linux x86_64 DEB 和 AppImage 统一使用 Ubuntu 22.04 容器构建，宿主机只需要 Docker：
+本地 Linux 构建始终使用固定的 Ubuntu 22.04 Docker 容器：
 
 ```bash
 pnpm tauri:build:linux
 ```
 
-构建脚本会创建固定 Node.js、pnpm、Rust 和系统依赖版本的 Ubuntu 22.04 镜像，并将安装包导出到 `artifacts/linux/`。宿主机的 `node_modules`、Rust target 和 Arch 系统库不会进入安装包。当前首版仅支持 x86_64；ARM64 和 RPM 尚未纳入发布验证。
+产物输出到 `artifacts/linux/`。GitHub Actions 不使用该容器，而是在 `ubuntu-22.04` runner 上原生安装依赖并构建 DEB/AppImage。
 
 ## Linux 串口权限
 
-PowerPico 客户端不应使用 root 权限运行。如果打开串口时提示权限不足，请将当前用户加入发行版的串口用户组：
-
-Ubuntu/Debian：
+客户端不应以 root 运行。Ubuntu/Debian 用户加入 `dialout`，Arch Linux 用户加入 `uucp`，然后注销并重新登录：
 
 ```bash
-sudo usermod -aG dialout "$USER"
+sudo usermod -aG dialout "$USER"  # Ubuntu/Debian
+sudo usermod -aG uucp "$USER"    # Arch Linux
 ```
 
-Arch Linux：
+真机验收项目见 [Linux 测试清单](docs/linux-testing.md)。
 
-```bash
-sudo usermod -aG uucp "$USER"
-```
+## 数据与网络
 
-修改用户组后需要注销并重新登录。可使用 `groups` 和 `ls -l /dev/ttyACM* /dev/ttyUSB*` 检查当前用户与设备权限。首版不会安装匹配范围过宽的 udev 规则。
+设置和官方固件保存在系统应用数据目录，临时采集记录保存在应用缓存目录，日志保存在平台日志目录。官方固件信息来自 PowerPico 原版固件服务，客户端更新信息来自本仓库 GitHub Releases。
 
-Linux 真机功能验收步骤参见 [Linux 测试清单](docs/linux-testing.md)。
+## 发布
 
-## 数据目录
-
-应用设置保存在操作系统的应用数据目录中，采集记录保存在应用缓存目录中，日志保存在平台日志目录中。应用不会依赖启动时的当前工作目录。
+推送严格格式的 `vX.Y.Z` 标签后，GitHub Actions 会执行前后端质量门禁，构建 macOS ARM64 DMG、Linux x86_64 DEB/AppImage，生成 `SHA256SUMS` 并发布正式 GitHub Release。
 
 ## 许可证
 
-本项目基于 [MIT License](LICENSE) 开源。第三方组件及其许可证信息请参阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+Copyright (C) 2026 OpenFeastTech。
+
+PowerPico Client 基于 [GNU General Public License v3.0 only](LICENSE) 发布，SPDX 标识为 `GPL-3.0-only`。第三方组件声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库中的旧 Python/Qt 客户端仅作为协议和行为兼容性参考，不参与本程序链接或打包。

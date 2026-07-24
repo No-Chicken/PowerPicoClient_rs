@@ -6,11 +6,13 @@ use parking_lot::RwLock;
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
+#[derive(Clone)]
 pub struct SettingsStore {
-    path: PathBuf,
-    value: RwLock<AppSettings>,
+    path: Arc<PathBuf>,
+    value: Arc<RwLock<AppSettings>>,
 }
 
 impl SettingsStore {
@@ -25,8 +27,8 @@ impl SettingsStore {
         }
         .sanitized();
         Ok(Self {
-            path,
-            value: RwLock::new(value),
+            path: Arc::new(path),
+            value: Arc::new(RwLock::new(value)),
         })
     }
     pub fn get(&self) -> AppSettings {
@@ -36,7 +38,7 @@ impl SettingsStore {
         let settings = settings.sanitized();
         let json = serde_json::to_vec_pretty(&settings)
             .map_err(|error| CoreError::Config(error.to_string()))?;
-        fs::write(&self.path, json)?;
+        fs::write(self.path.as_ref(), json)?;
         *self.value.write() = settings.clone();
         Ok(settings)
     }
@@ -45,7 +47,7 @@ impl SettingsStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{MetricId, ThemeMode};
+    use crate::types::{FirmwareMode, Language, MetricId, ThemeMode};
     use tempfile::tempdir;
 
     #[test]
@@ -70,5 +72,9 @@ mod tests {
             migrated.waveform_metrics,
             AppSettings::default().waveform_metrics
         );
+        assert_eq!(migrated.ui_scale, 0);
+        assert!(migrated.check_update_at_startup);
+        assert_eq!(migrated.firmware_mode, FirmwareMode::Official);
+        assert_eq!(migrated.language, Language::ZhCn);
     }
 }

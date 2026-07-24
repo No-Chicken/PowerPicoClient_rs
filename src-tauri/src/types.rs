@@ -61,6 +61,22 @@ pub struct CaptureSummary {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct RangeStatistics {
+    pub start: f64,
+    pub end: f64,
+    pub duration: f64,
+    pub point_count: u64,
+    pub voltage_average: f64,
+    pub voltage_peak: f64,
+    pub current_average: f64,
+    pub current_peak: f64,
+    pub power_average_mw: f64,
+    pub power_peak_mw: f64,
+    pub energy_mah: f64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PointReading {
     pub time: f64,
     pub voltage: f64,
@@ -103,7 +119,35 @@ pub enum FirmwareStage {
 pub struct FirmwareProgress {
     pub stage: FirmwareStage,
     pub percent: u8,
-    pub message: String,
+    pub message_key: String,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OfficialFirmwareInfo {
+    pub version: String,
+    pub release_date: String,
+    pub url: String,
+    pub local_path: Option<String>,
+    pub downloaded: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FirmwareDownloadProgress {
+    pub percent: u8,
+    pub stage: String,
+    pub detail: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientUpdateInfo {
+    pub current_version: String,
+    pub latest_version: String,
+    pub release_url: String,
+    pub update_available: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -116,10 +160,23 @@ pub enum ThemeMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Language {
+    #[serde(rename = "auto")]
+    Auto,
     #[serde(rename = "zh-CN")]
     ZhCn,
+    #[serde(rename = "zh-HK")]
+    ZhHk,
     #[serde(rename = "en")]
     En,
+    #[serde(rename = "ja")]
+    Ja,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum FirmwareMode {
+    Official,
+    Custom,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -158,6 +215,28 @@ pub struct AppSettings {
     pub language: Language,
     #[serde(default = "default_waveform_metrics")]
     pub waveform_metrics: Vec<MetricId>,
+    #[serde(default)]
+    pub ui_scale: u16,
+    #[serde(default = "default_true")]
+    pub check_update_at_startup: bool,
+    #[serde(default)]
+    pub anti_aliasing: bool,
+    #[serde(default = "default_firmware_mode")]
+    pub firmware_mode: FirmwareMode,
+    #[serde(default)]
+    pub custom_firmware_path: String,
+    #[serde(default)]
+    pub local_firmware_version: String,
+    #[serde(default)]
+    pub local_firmware_release_date: String,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_firmware_mode() -> FirmwareMode {
+    FirmwareMode::Official
 }
 
 impl AppSettings {
@@ -168,6 +247,9 @@ impl AppSettings {
         if self.waveform_metrics.is_empty() {
             self.waveform_metrics = default_waveform_metrics();
         }
+        if !matches!(self.ui_scale, 0 | 100 | 125 | 150 | 175 | 200) {
+            self.ui_scale = 0;
+        }
         self
     }
 }
@@ -176,8 +258,15 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: ThemeMode::System,
-            language: Language::ZhCn,
+            language: Language::Auto,
             waveform_metrics: default_waveform_metrics(),
+            ui_scale: 0,
+            check_update_at_startup: true,
+            anti_aliasing: false,
+            firmware_mode: FirmwareMode::Official,
+            custom_firmware_path: String::new(),
+            local_firmware_version: String::new(),
+            local_firmware_release_date: String::new(),
         }
     }
 }

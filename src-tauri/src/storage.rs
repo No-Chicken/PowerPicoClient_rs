@@ -8,7 +8,7 @@ use chrono::Local;
 
 use crate::{
     error::{CoreError, CoreResult},
-    types::{CaptureSummary, PointReading, RenderSeries, Sample},
+    types::{CaptureSummary, PointReading, RangeStatistics, RenderSeries, Sample},
 };
 
 pub const L0_SIZE: u64 = 16;
@@ -262,6 +262,9 @@ pub fn recording_summary(path: &Path, window_seconds: Option<f64>) -> CoreResult
     let mut c_peak = f32::NEG_INFINITY;
     while reader.read_exact(&mut buffer).is_ok() {
         let sample = decode_l0(&buffer);
+        if sample.time < start_time {
+            continue;
+        }
         points += 1;
         v_sum += sample.voltage as f64;
         c_sum += sample.current as f64;
@@ -276,7 +279,7 @@ pub fn recording_summary(path: &Path, window_seconds: Option<f64>) -> CoreResult
     let duration = last.time - start_time;
     Ok(CaptureSummary {
         point_count: points,
-        duration: last.time,
+        duration,
         latest_voltage: last.voltage as f64,
         voltage_average: v_sum / points_f,
         voltage_peak: v_peak as f64,
@@ -287,6 +290,92 @@ pub fn recording_summary(path: &Path, window_seconds: Option<f64>) -> CoreResult
         power_average_mw: p_sum / points_f,
         energy_mah: (c_sum / points_f) * duration / 3_600_000.0,
     })
+}
+
+pub fn range_statistics(path: &Path, start: f64, end: f64) -> CoreResult<RangeStatistics> {
+    validate_l0(path)?;
+    if !start.is_finite() || !end.is_finite() || end <= start {
+        return Err(CoreError::InvalidRecording("invalid analysis range".into()));
+    }
+    let mut file = File::open(path)?;
+    let count = file.metadata()?.len() / L0_SIZE;
+    let from = lower_bound(&mut file, count, L0_SIZE, start, false)?;
+    file.seek(SeekFrom::Start(from * L0_SIZE))?;
+    let mut reader = BufReader::new(file);
+    let mut bytes = [0u8; L0_SIZE as usize];
+    let mut points = 0u64;
+    let mut v_sum = 0.0;
+    let mut c_sum = 0.0;
+    let mut p_sum = 0.0;
+    let mut v_peak = f32::NEG_INFINITY;
+    let mut c_peak = f32::NEG_INFINITY;
+    let mut p_peak = f64::NEG_INFINITY;
+    while reader.read_exact(&mut bytes).is_ok() {
+        let sample = decode_l0(&bytes);
+        if sample.time < start {
+            continue;
+        }
+        if sample.time > end {
+            break;
+        }
+        let power = sample.voltage as f64 * sample.current as f64 / 1000.0;
+        points += 1;
+        v_sum += sample.voltage as f64;
+        c_sum += sample.current as f64;
+        p_sum += power;
+        v_peak = v_peak.max(sample.voltage);
+        c_peak = c_peak.max(sample.current);
+        p_peak = p_peak.max(power);
+    }
+    if points == 0 {
+        return Ok(RangeStatistics {
+            start,
+            end,
+            duration: end - start,
+            ..Default::default()
+        });
+    }
+    let count_f = points as f64;
+    let current_average = c_sum / count_f;
+    Ok(RangeStatistics {
+        start,
+        end,
+        duration: end - start,
+        point_count: points,
+        voltage_average: v_sum / count_f,
+        voltage_peak: v_peak as f64,
+        current_average,
+        current_peak: c_peak as f64,
+        power_average_mw: p_sum / count_f,
+        power_peak_mw: p_peak,
+        energy_mah: current_average * (end - start) / 3_600_000.0,
+    })
+}
+
+pub fn clean_stale_recordings(
+    records_dir: &Path,
+    max_age: std::time::Duration,
+) -> CoreResult<usize> {
+    if !records_dir.exists() {
+        return Ok(0);
+    }
+    let now = std::time::SystemTime::now();
+    let mut removed = 0;
+    for entry in fs::read_dir(records_dir)? {
+        let path = entry?.path();
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if !name.starts_with("record_") || !name.ends_with(".bin") || name.contains(".L") {
+            continue;
+        }
+        let modified = fs::metadata(&path)?.modified()?;
+        if now.duration_since(modified).unwrap_or_default() > max_age {
+            clear_record_family(&path)?;
+            removed += 1;
+        }
+    }
+    Ok(removed)
 }
 
 pub fn point_at(path: &Path, time_seconds: f64) -> CoreResult<PointReading> {
@@ -611,5 +700,91 @@ mod tests {
         let selected = point_at(&path, 3.1).unwrap();
         assert_eq!(selected.time, 4.0);
         assert_eq!(selected.power_mw, 0.16);
+    }
+
+    #[test]
+    fn calculates_exact_range_statistics() {
+        let dir = tempdir().unwrap();
+        let mut writer = RecordWriter::create(dir.path()).unwrap();
+        writer
+            .push_samples(&[
+                Sample {
+                    time: 0.0,
+                    voltage: 1.0,
+                    current: 10.0,
+                },
+                Sample {
+                    time: 1.0,
+                    voltage: 2.0,
+                    current: 20.0,
+                },
+                Sample {
+                    time: 2.0,
+                    voltage: 3.0,
+                    current: 30.0,
+                },
+            ])
+            .unwrap();
+        let path = writer.l0_path.clone();
+        writer.finish().unwrap();
+        let stats = range_statistics(&path, 0.5, 2.0).unwrap();
+        assert_eq!(stats.point_count, 2);
+        assert_eq!(stats.voltage_average, 2.5);
+        assert_eq!(stats.current_peak, 30.0);
+        assert_eq!(stats.power_peak_mw, 0.09);
+    }
+
+    #[test]
+    fn window_summary_excludes_the_preceding_sample() {
+        let dir = tempdir().unwrap();
+        let mut writer = RecordWriter::create(dir.path()).unwrap();
+        writer
+            .push_samples(&[
+                Sample {
+                    time: 0.0,
+                    voltage: 1.0,
+                    current: 10.0,
+                },
+                Sample {
+                    time: 1.0,
+                    voltage: 2.0,
+                    current: 20.0,
+                },
+                Sample {
+                    time: 2.0,
+                    voltage: 3.0,
+                    current: 30.0,
+                },
+            ])
+            .unwrap();
+        let path = writer.l0_path.clone();
+        writer.finish().unwrap();
+        let summary = recording_summary(&path, Some(0.5)).unwrap();
+        assert_eq!(summary.point_count, 1);
+        assert_eq!(summary.duration, 0.5);
+        assert_eq!(summary.voltage_average, 3.0);
+    }
+
+    #[test]
+    fn stale_cleanup_only_removes_internal_record_families() {
+        let dir = tempdir().unwrap();
+        let mut writer = RecordWriter::create(dir.path()).unwrap();
+        writer
+            .push_samples(&[Sample {
+                time: 0.0,
+                voltage: 1.0,
+                current: 1.0,
+            }])
+            .unwrap();
+        let path = writer.l0_path.clone();
+        writer.finish().unwrap();
+        let unrelated = dir.path().join("user-data.bin");
+        fs::write(&unrelated, b"keep").unwrap();
+        assert_eq!(
+            clean_stale_recordings(dir.path(), std::time::Duration::ZERO).unwrap(),
+            1
+        );
+        assert!(!path.exists());
+        assert!(unrelated.exists());
     }
 }

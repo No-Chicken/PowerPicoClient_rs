@@ -19,168 +19,197 @@ env:
 
 jobs:
   validate-version:
-    name: Validate release version
+    name: Validate version
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Validate tag and application versions
-        id: version
+      - id: version
+        name: Match tag and package versions
         shell: bash
         run: |
           tag="${GITHUB_REF_NAME}"
           if [[ ! "${tag}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "Release tag must use the vX.Y.Z format, got: ${tag}" >&2
+            echo "Release tag must use vX.Y.Z, got ${tag}" >&2
             exit 1
           fi
-
           version="${BASH_REMATCH[1]}"
           package_version="$(node -p "require('./package.json').version")"
           tauri_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
           cargo_version="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
-
-          for declared_version in "${package_version}" "${tauri_version}" "${cargo_version}"; do
-            if [[ "${declared_version}" != "${version}" ]]; then
-              echo "Tag version ${version} does not match application version ${declared_version}" >&2
-              exit 1
-            fi
+          for declared in "${package_version}" "${tauri_version}" "${cargo_version}"; do
+            [[ "${declared}" == "${version}" ]] || { echo "Version ${declared} does not match ${version}" >&2; exit 1; }
           done
-
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
-  build-linux:
-    name: Build Linux packages
+  quality:
+    name: Quality gate
     needs: validate-version
     runs-on: ubuntu-22.04
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libayatana-appindicator3-dev libssl-dev libudev-dev libwebkit2gtk-4.1-dev libxdo-dev librsvg2-dev patchelf pkg-config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+      - run: cargo fmt --check
+        working-directory: src-tauri
+      - run: cargo clippy -- -D warnings
+        working-directory: src-tauri
+      - run: cargo test
+        working-directory: src-tauri
 
-      - name: Build DEB and AppImage in Ubuntu 22.04
-        run: bash scripts/build-linux.sh
-
-      - name: Normalize Linux package names
+  build-linux:
+    name: Build Linux x86_64
+    needs: [validate-version, quality]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libayatana-appindicator3-dev libssl-dev libudev-dev libwebkit2gtk-4.1-dev libxdo-dev librsvg2-dev patchelf pkg-config
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri build --ci --bundles deb,appimage
+      - name: Normalize package names
         env:
           VERSION: ${{ needs.validate-version.outputs.version }}
         shell: bash
         run: |
           shopt -s nullglob
-          deb_files=(artifacts/linux/*.deb)
-          appimage_files=(artifacts/linux/*.AppImage)
-
-          if [[ ${#deb_files[@]} -ne 1 || ${#appimage_files[@]} -ne 1 ]]; then
-            echo "Expected exactly one DEB and one AppImage" >&2
-            exit 1
-          fi
-
           mkdir -p release
-          cp "${deb_files[0]}" "release/PowerPico-Client_${VERSION}_amd64.deb"
-          cp "${appimage_files[0]}" "release/PowerPico-Client_${VERSION}_amd64.AppImage"
-
-      - name: Upload Linux packages
-        uses: actions/upload-artifact@v4
+          deb=(src-tauri/target/release/bundle/deb/*.deb)
+          appimage=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          [[ ${#deb[@]} -eq 1 && ${#appimage[@]} -eq 1 ]] || { echo "Expected one DEB and one AppImage" >&2; exit 1; }
+          cp "${deb[0]}" "release/PowerPico-Client_${VERSION}_amd64.deb"
+          cp "${appimage[0]}" "release/PowerPico-Client_${VERSION}_amd64.AppImage"
+      - uses: actions/upload-artifact@v4
         with:
           name: linux-packages
           path: release/*
           if-no-files-found: error
-          retention-days: 7
 
   build-macos:
-    name: Build macOS ARM64 package
-    needs: validate-version
+    name: Build macOS ARM64
+    needs: [validate-version, quality]
     runs-on: macos-14
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-
-      - name: Set up pnpm
-        shell: bash
+      - name: Enable pnpm
         run: |
           corepack enable
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
-
-      - name: Set up Rust
-        shell: bash
-        run: |
-          rustup toolchain install "${RUST_VERSION}" --profile minimal --target aarch64-apple-darwin
-          rustup default "${RUST_VERSION}"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build unsigned ARM64 DMG
-        run: pnpm tauri build --ci --no-sign --target aarch64-apple-darwin --bundles dmg
-
-      - name: Normalize macOS package name
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm tauri build --ci --no-sign --target aarch64-apple-darwin --bundles dmg
+      - name: Normalize package name
         env:
           VERSION: ${{ needs.validate-version.outputs.version }}
         shell: bash
         run: |
           shopt -s nullglob
-          dmg_files=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
-
-          if [[ ${#dmg_files[@]} -ne 1 ]]; then
-            echo "Expected exactly one DMG" >&2
-            exit 1
-          fi
-
           mkdir -p release
-          cp "${dmg_files[0]}" "release/PowerPico-Client_${VERSION}_macos_aarch64.dmg"
-
-      - name: Upload macOS package
-        uses: actions/upload-artifact@v4
+          dmg=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
+          [[ ${#dmg[@]} -eq 1 ]] || { echo "Expected one DMG" >&2; exit 1; }
+          cp "${dmg[0]}" "release/PowerPico-Client_${VERSION}_macos_aarch64.dmg"
+      - uses: actions/upload-artifact@v4
         with:
           name: macos-package
           path: release/*
           if-no-files-found: error
-          retention-days: 7
+
+  prepare-release:
+    name: Prepare release assets
+    needs: [validate-version, build-linux, build-macos]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download Linux packages
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-packages
+          path: assets
+      - name: Download macOS package
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-package
+          path: assets
+      - name: Verify assets and create checksums
+        env:
+          VERSION: ${{ needs.validate-version.outputs.version }}
+        working-directory: assets
+        run: |
+          test -f "PowerPico-Client_${VERSION}_macos_aarch64.dmg"
+          test -f "PowerPico-Client_${VERSION}_amd64.deb"
+          test -f "PowerPico-Client_${VERSION}_amd64.AppImage"
+          sha256sum PowerPico-Client_* > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: assets/*
+          if-no-files-found: error
 
   publish-release:
     name: Publish GitHub Release
-    needs:
-      - validate-version
-      - build-linux
-      - build-macos
+    needs: [validate-version, prepare-release]
     runs-on: ubuntu-22.04
     steps:
-      - name: Download packages
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
+          name: release-assets
           path: release-assets
-
-      - name: Create GitHub Release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.validate-version.outputs.version }}
-        shell: bash
         run: |
-          notes="Linux packages are built on Ubuntu 22.04. The macOS ARM64 DMG is currently unsigned and not notarized."
-
-          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" release-assets/*/* \
-              --repo "${GITHUB_REPOSITORY}" \
-              --clobber
-            gh release edit "${GITHUB_REF_NAME}" \
-              --repo "${GITHUB_REPOSITORY}" \
-              --title "PowerPico Client ${VERSION}" \
-              --notes "${notes}"
-          else
-            gh release create "${GITHUB_REF_NAME}" release-assets/*/* \
-              --repo "${GITHUB_REPOSITORY}" \
-              --verify-tag \
-              --title "PowerPico Client ${VERSION}" \
-              --notes "${notes}"
-          fi
+          notes="Supported packages: macOS 11+ Apple Silicon DMG and Linux x86_64 DEB/AppImage. The macOS build is unsigned and not notarized. Source code is licensed under GPL-3.0-only."
+          gh release create "${GITHUB_REF_NAME}" release-assets/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
+            --title "PowerPico Client ${VERSION}" \
+            --generate-notes \
+            --notes "${notes}"

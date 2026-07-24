@@ -17,7 +17,7 @@ use crate::{
     error::{CoreError, CoreResult},
     protocol::FrameParser,
     storage::{self, RecordWriter},
-    types::{CaptureState, CaptureStatus, CaptureSummary},
+    types::{CaptureState, CaptureStatus, CaptureSummary, RangeStatistics},
 };
 
 enum ReaderMessage {
@@ -65,6 +65,9 @@ impl CaptureManager {
             .read()
             .clone()
             .ok_or(CoreError::NoRecording)
+    }
+    pub fn range_statistics(&self, start: f64, end: f64) -> CoreResult<RangeStatistics> {
+        storage::range_statistics(&self.record_path()?, start, end)
     }
     pub fn is_running(&self) -> bool {
         matches!(
