@@ -27,7 +27,7 @@ pub const RELEASE_NOTES_URL: &str =
     "https://no-chicken.com/content/Power-Pico/others/release_note.html";
 pub const HELP_URL: &str = "https://no-chicken.com/content/Power-Pico/intro.html";
 pub const FEEDBACK_URL: &str = "https://no-chicken.com/content/discuss_groups.html";
-const GITHUB_LATEST_URL: &str = "https://github.com/haoyn231/power_pico_client/releases/latest";
+const GITHUB_LATEST_URL: &str = "https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest";
 
 #[derive(Deserialize)]
 struct FirmwareResponse {

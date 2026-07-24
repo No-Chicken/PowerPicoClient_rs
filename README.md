@@ -1,33 +1,108 @@
-# PowerPico Client
+<div align="center">
+  <h1 align="center">PowerPico Client</h1>
+  <p align="center">面向 PowerPico 的跨平台数据采集、波形分析与固件升级客户端</p>
 
-PowerPico Client 是使用 Tauri 2、Svelte 5 与 Rust 重写的 PowerPico 桌面客户端，面向 macOS 和 Linux，提供高速数据采集、波形分析、记录导入导出和固件升级。
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.1.1-blue" alt="Version 0.1.1"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
+  <img src="https://img.shields.io/badge/Tauri-v2-24C8DB" alt="Tauri v2">
+  <img src="https://img.shields.io/badge/Svelte-v5-FF3E00" alt="Svelte v5">
+  <img src="https://img.shields.io/badge/Core-Rust-DEA584" alt="Rust">
+  <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux-informational" alt="macOS and Linux">
+  <br>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/stargazers"><img src="https://img.shields.io/github/stars/No-Chicken/PowerPicoClient_rs.svg" alt="GitHub stars"></a>
+</div>
 
-## 平台支持
+---
+
+## 📖 项目简介
+
+**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，面向 macOS、Linux 和 Windows，提供高速数据采集、实时波形、精确区间分析、记录导入导出和固件升级能力。
+
+<p align="center">
+  <a href="https://github.com/No-Chicken/Power-Pico">Power-Pico 主项目</a> |
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest">下载最新版</a> |
+  <a href="https://no-chicken.com/content/Power-Pico/UserManual/client_operation.html">客户端操作说明</a> |
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/issues">问题反馈</a>
+</p>
+
+<p align="center">
+  <img border="1px" width="90%" src="./docs/images/powerpico-client.png" alt="PowerPico Client 实时波形界面">
+</p>
+
+### ✨ 核心特性
+
+- **高速采集**：Rust 实现 1.5 Mbps 数据接收、PowerPico 协议解析、异常采样过滤和稳定设备标识。
+- **实时波形**：支持实时跟随、历史浏览、时间/电压/电流独立缩放和平移，以及原始采样点精确读取。
+- **多级数据**：兼容原客户端 L0/L1-L5 分级记录和 LOD 波形读取，支持 BIN/CSV 导入导出。
+- **统计分析**：提供全局、最近 10 分钟、最近 1 分钟、最近 1 秒统计，以及右键拖选精确区间分析。
+- **固件升级**：支持官方固件查询与缓存、自定义 BIN、Bootloader 重新枚举、YMODEM 刷写、进度显示和取消。
+- **跨平台体验**：支持简体中文、繁体中文、英语、日语、系统语言模式，以及主题、界面缩放和渲染质量设置。
+- **更新与维护**：支持 GitHub Releases 更新检查、内部临时记录自动清理和平台滚动日志。
+
+---
+
+## 🚀 下载与安装
+
+请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
+
+### macOS Apple Silicon
+
+1. 下载 `PowerPico-Client_<版本>_macos_aarch64.dmg`。
+2. 打开 DMG，将 `PowerPico Client.app` 拖入“应用程序”。
+3. 首次运行时，在 Finder 中按住 Control 点击应用并选择“打开”。
+
+macOS 安装包目前未签名且未公证。如果系统仍然阻止运行，可在确认安装包来自本仓库后执行：
+
+```zsh
+xattr -dr com.apple.quarantine "/Applications/PowerPico Client.app"
+open "/Applications/PowerPico Client.app"
+```
+
+### Ubuntu / Debian Linux
+
+DEB 安装包：
+
+```bash
+sudo apt install ./PowerPico-Client_<版本>_amd64.deb
+```
+
+AppImage：
+
+```bash
+chmod +x PowerPico-Client_<版本>_amd64.AppImage
+./PowerPico-Client_<版本>_amd64.AppImage
+```
+
+---
+
+## 💻 平台支持
+
+<div align="center">
 
 | 平台 | 架构 | 发布包 | 状态 |
-| --- | --- | --- | --- |
-| macOS 11+ | Apple Silicon ARM64 | DMG | 支持，当前未签名且未公证 |
-| Ubuntu/Debian Linux | x86_64 | DEB、AppImage | 支持 |
+| :--- | :--- | :--- | :--- |
+| macOS 11+ | Apple Silicon ARM64 | DMG | 支持，未签名且未公证 |
+| Ubuntu / Debian Linux | x86_64 | DEB、AppImage | 支持 |
+
+</div>
 
 Windows、macOS Intel、Linux ARM64 和 RPM 暂不支持，也不属于当前发布目标。
 
-## 已实现功能
+DEB 包基于 Ubuntu 22.04 构建，理论上可在 Debian 11+、Ubuntu 22.04+、Linux Mint 21+ 等系统上安装。AppImage 可在大多数 x86_64 Linux 上运行，但不保证兼容性。
+### Linux 串口权限
 
-- macOS `/dev/cu.*` 与 Linux `/dev/ttyACM*`、`/dev/ttyUSB*` 串口发现及稳定设备标识
-- Rust 实现的 1.5 Mbps 数据接收、PowerPico 协议解析和异常采样过滤
-- 与原客户端兼容的 L0/L1-L5 分级记录、LOD 波形读取、BIN/CSV 导入导出
-- 实时跟随、历史浏览、时间/电压/电流独立缩放和平移及精确原始采样点读取
-- 全局、最近 10 分钟、最近 1 分钟和最近 1 秒统计
-- 右键拖选区间分析，包括电压、电流、功率、时长、采样数和 mAh
-- 可排序、增删并持久化的实时指标卡片
-- 官方固件版本查询、下载和本地缓存，以及自定义 BIN 固件
-- Bootloader 重新枚举、YMODEM 刷写、进度显示和取消
-- 基于 GitHub Releases 的启动更新检查和手动更新检查
-- 简体中文、繁体中文、英语、日语和跟随系统语言
-- 浅色、深色、跟随系统主题，界面缩放和波形渲染质量设置
-- 内部临时记录自动清理、平台应用数据目录和滚动日志
+客户端不应以 root 运行。Ubuntu/Debian 用户加入 `dialout`，Arch Linux 用户加入 `uucp`，然后注销并重新登录：
 
-## 开发
+```bash
+sudo usermod -aG dialout "$USER"  # Ubuntu / Debian
+sudo usermod -aG uucp "$USER"     # Arch Linux
+```
+
+真机验收项目见 [Linux 测试清单](./docs/linux-testing.md)。
+
+---
+
+## 🛠️ 开发与构建
 
 需要 Rust 1.77.2+、Node.js 20+ 和 pnpm 10+。
 
@@ -42,7 +117,7 @@ Arch Linux 开发依赖：
 sudo pacman -S --needed base-devel webkit2gtk-4.1 libappindicator-gtk3 librsvg systemd
 ```
 
-## 质量检查
+### 质量检查
 
 ```bash
 pnpm check
@@ -55,7 +130,7 @@ cargo clippy -- -D warnings
 cargo test
 ```
 
-## 构建
+### 构建安装包
 
 macOS ARM64 未签名 DMG：
 
@@ -63,35 +138,37 @@ macOS ARM64 未签名 DMG：
 pnpm tauri build --bundles dmg
 ```
 
-本地 Linux 构建始终使用固定的 Ubuntu 22.04 Docker 容器：
+本地 Linux 构建使用固定的 Ubuntu 22.04 Docker 容器：
 
 ```bash
 pnpm tauri:build:linux
 ```
 
-产物输出到 `artifacts/linux/`。GitHub Actions 不使用该容器，而是在 `ubuntu-22.04` runner 上原生安装依赖并构建 DEB/AppImage。
+Linux 产物输出到 `artifacts/linux/`。GitHub Actions 不使用该容器，而是在 `ubuntu-22.04` runner 上原生构建 DEB 和 AppImage。
 
-## Linux 串口权限
+---
 
-客户端不应以 root 运行。Ubuntu/Debian 用户加入 `dialout`，Arch Linux 用户加入 `uucp`，然后注销并重新登录：
+## 📦 发布
 
-```bash
-sudo usermod -aG dialout "$USER"  # Ubuntu/Debian
-sudo usermod -aG uucp "$USER"    # Arch Linux
-```
+Release workflow 支持两种入口：
 
-真机验收项目见 [Linux 测试清单](docs/linux-testing.md)。
+- 推送严格格式的 `vX.Y.Z` tag 后自动执行。
+- 在 GitHub Actions 页面手动运行 Release workflow，并输入一个已有的 `vX.Y.Z` tag。
 
-## 数据与网络
+发布前必须将中文说明保存到 `.github/release-notes/vX.Y.Z.md`。工作流会校验 tag 与 npm、Tauri、Cargo 版本一致，执行前后端质量检查，构建 macOS ARM64 DMG、Linux x86_64 DEB/AppImage，生成 `SHA256SUMS` 并发布正式 Release。重新运行已发布 tag 时会覆盖同名资产和说明。
 
-设置和官方固件保存在系统应用数据目录，临时采集记录保存在应用缓存目录，日志保存在平台日志目录。官方固件信息来自 PowerPico 原版固件服务，客户端更新信息来自本仓库 GitHub Releases。
+---
 
-## 发布
+## 📂 数据与网络
 
-推送严格格式的 `vX.Y.Z` 标签后，GitHub Actions 会执行前后端质量门禁，构建 macOS ARM64 DMG、Linux x86_64 DEB/AppImage，生成 `SHA256SUMS` 并发布正式 GitHub Release。
+设置和官方固件保存在系统应用数据目录，临时采集记录保存在应用缓存目录，日志保存在平台日志目录。官方固件信息来自 PowerPico 固件服务，客户端更新信息来自本仓库 GitHub Releases。
 
-## 许可证
+---
+
+## 📄 许可证
 
 Copyright (C) 2026 OpenFeastTech。
 
-PowerPico Client 基于 [GNU General Public License v3.0 only](LICENSE) 发布，SPDX 标识为 `GPL-3.0-only`。第三方组件声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。仓库中的旧 Python/Qt 客户端仅作为协议和行为兼容性参考，不参与本程序链接或打包。
+PowerPico Client 基于 [GNU General Public License v3.0 only](./LICENSE) 发布，SPDX 标识为 `GPL-3.0-only`。第三方组件声明见 [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md)。仓库中的旧 Python/Qt 客户端仅作为协议和行为兼容性参考，不参与本程序链接或打包。
+
+欢迎通过 [Issues](https://github.com/No-Chicken/PowerPicoClient_rs/issues) 和 Pull Request 参与改进。

@@ -4,12 +4,18 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要构建和发布的已有标签（格式：vX.Y.Z）"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -19,32 +25,89 @@ env:
 
 jobs:
   validate-version:
-    name: Validate version
+    name: Validate version and release notes
     runs-on: ubuntu-22.04
     outputs:
+      tag: ${{ steps.release-ref.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - id: version
-        name: Match tag and package versions
+      - id: release-ref
+        name: Resolve release tag
         shell: bash
+        env:
+          MANUAL_TAG: ${{ inputs.tag }}
         run: |
-          tag="${GITHUB_REF_NAME}"
-          if [[ ! "${tag}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${MANUAL_TAG}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Release tag must use vX.Y.Z, got ${tag}" >&2
             exit 1
           fi
-          version="${BASH_REMATCH[1]}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release-ref.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Check out release metadata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.repository.default_branch || steps.release-ref.outputs.tag }}
+          path: release-metadata
+
+      - id: version
+        name: Match tag and package versions
+        shell: bash
+        env:
+          TAG: ${{ steps.release-ref.outputs.tag }}
+        run: |
+          git show-ref --verify --quiet "refs/tags/${TAG}" || {
+            echo "Release tag ${TAG} does not exist" >&2
+            exit 1
+          }
+          tag_commit="$(git rev-list -n 1 "${TAG}")"
+          head_commit="$(git rev-parse HEAD)"
+          [[ "${tag_commit}" == "${head_commit}" ]] || {
+            echo "Checked out commit ${head_commit} does not match ${TAG} (${tag_commit})" >&2
+            exit 1
+          }
+
+          version="${TAG#v}"
           package_version="$(node -p "require('./package.json').version")"
           tauri_version="$(node -p "require('./src-tauri/tauri.conf.json').version")"
           cargo_version="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)"
           for declared in "${package_version}" "${tauri_version}" "${cargo_version}"; do
-            [[ "${declared}" == "${version}" ]] || { echo "Version ${declared} does not match ${version}" >&2; exit 1; }
+            [[ "${declared}" == "${version}" ]] || {
+              echo "Version ${declared} does not match ${TAG}" >&2
+              exit 1
+            }
           done
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate Chinese release notes
+        shell: bash
+        env:
+          TAG: ${{ steps.release-ref.outputs.tag }}
+        run: |
+          notes="release-metadata/.github/release-notes/${TAG}.md"
+          [[ -s "${notes}" ]] || {
+            echo "Missing or empty release notes: ${notes}" >&2
+            exit 1
+          }
+          mkdir -p release-note-artifact
+          cp "${notes}" "release-note-artifact/${TAG}.md"
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ steps.release-ref.outputs.tag }}
+          path: release-note-artifact/${{ steps.release-ref.outputs.tag }}.md
+          if-no-files-found: error
 
   quality:
     name: Quality gate
@@ -52,6 +115,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-version.outputs.tag }}
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
@@ -87,6 +152,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-version.outputs.tag }}
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
@@ -115,7 +182,10 @@ jobs:
           mkdir -p release
           deb=(src-tauri/target/release/bundle/deb/*.deb)
           appimage=(src-tauri/target/release/bundle/appimage/*.AppImage)
-          [[ ${#deb[@]} -eq 1 && ${#appimage[@]} -eq 1 ]] || { echo "Expected one DEB and one AppImage" >&2; exit 1; }
+          [[ ${#deb[@]} -eq 1 && ${#appimage[@]} -eq 1 ]] || {
+            echo "Expected one DEB and one AppImage" >&2
+            exit 1
+          }
           cp "${deb[0]}" "release/PowerPico-Client_${VERSION}_amd64.deb"
           cp "${appimage[0]}" "release/PowerPico-Client_${VERSION}_amd64.AppImage"
       - uses: actions/upload-artifact@v4
@@ -130,6 +200,8 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-version.outputs.tag }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -154,7 +226,10 @@ jobs:
           shopt -s nullglob
           mkdir -p release
           dmg=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
-          [[ ${#dmg[@]} -eq 1 ]] || { echo "Expected one DMG" >&2; exit 1; }
+          [[ ${#dmg[@]} -eq 1 ]] || {
+            echo "Expected one DMG" >&2
+            exit 1
+          }
           cp "${dmg[0]}" "release/PowerPico-Client_${VERSION}_macos_aarch64.dmg"
       - uses: actions/upload-artifact@v4
         with:
@@ -201,15 +276,37 @@ jobs:
         with:
           name: release-assets
           path: release-assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes-${{ needs.validate-version.outputs.tag }}
+          path: release-notes
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate-version.outputs.tag }}
           VERSION: ${{ needs.validate-version.outputs.version }}
+        shell: bash
         run: |
-          notes="Supported packages: macOS 11+ Apple Silicon DMG and Linux x86_64 DEB/AppImage. The macOS build is unsigned and not notarized. Source code is licensed under GPL-3.0-only."
-          gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --repo "${GITHUB_REPOSITORY}" \
-            --verify-tag \
-            --title "PowerPico Client ${VERSION}" \
-            --generate-notes \
-            --notes "${notes}"
+          notes_file="release-notes/${TAG}.md"
+          [[ -s "${notes_file}" ]] || {
+            echo "Missing release notes artifact: ${notes_file}" >&2
+            exit 1
+          }
+
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" release-assets/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+            gh release edit "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "PowerPico Client ${VERSION}" \
+              --notes-file "${notes_file}" \
+              --draft=false \
+              --prerelease=false
+          else
+            gh release create "${TAG}" release-assets/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --verify-tag \
+              --title "PowerPico Client ${VERSION}" \
+              --notes-file "${notes_file}"
+          fi
