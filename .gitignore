@@ -1,0 +1,25 @@
+# 前端依赖与构建产物
+node_modules/
+dist/
+.vite/
+coverage/
+
+# Rust / Tauri 生成文件
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# 日志与本地环境文件
+*.log
+*.local
+.env
+.env.*
+!.env.example
+
+# 编辑器与操作系统文件
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+

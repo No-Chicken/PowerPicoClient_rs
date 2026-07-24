@@ -1,0 +1,37 @@
+{
+  "name": "powerpico-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/plugin-dialog": "^2.4.0",
+    "clsx": "^2.1.1",
+    "@lucide/svelte": "^1.26.0",
+    "svelte": "^5.0.0",
+    "svelte-i18n": "^4.0.1",
+    "tailwind-merge": "^2.6.0",
+    "uplot": "^1.6.31"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@tauri-apps/cli": "^2.8.0",
+    "@testing-library/svelte": "^5.2.6",
+    "@types/node": "^22.10.2",
+    "jsdom": "^25.0.1",
+    "svelte-check": "^4.1.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
+  },
+  "packageManager": "pnpm@10.18.1"
+}
