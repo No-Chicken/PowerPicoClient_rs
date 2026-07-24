@@ -169,13 +169,17 @@ jobs:
         run: |
           notes="Linux packages are built on Ubuntu 22.04. The macOS ARM64 DMG is currently unsigned and not notarized."
 
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" release-assets/*/* --clobber
+          if gh release view "${GITHUB_REF_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" release-assets/*/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
             gh release edit "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
               --title "PowerPico Client ${VERSION}" \
               --notes "${notes}"
           else
             gh release create "${GITHUB_REF_NAME}" release-assets/*/* \
+              --repo "${GITHUB_REPOSITORY}" \
               --verify-tag \
               --title "PowerPico Client ${VERSION}" \
               --notes "${notes}"
