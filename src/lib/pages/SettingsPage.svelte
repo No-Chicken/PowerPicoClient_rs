@@ -19,7 +19,10 @@
   let links: ExternalLinks | null = null;
   let checkingUpdate = false;
 
-  onMount(async () => { links = await api.externalLinks(); });
+  onMount(async () => {
+    try { links = await api.externalLinks(); }
+    catch { notify($_('errors.externalLink'), 'error'); }
+  });
 
   function themeChanged(event: Event) {
     void update({ ...settings, theme: (event.target as HTMLSelectElement).value as ThemeMode });
@@ -33,13 +36,19 @@
     void update({ ...settings, [key]: value });
   }
 
+  async function openExternalLink(url?: string) {
+    if (!url) return notify($_('errors.externalLink'), 'error');
+    try { await openUrl(url); }
+    catch { notify($_('errors.externalLink'), 'error'); }
+  }
+
   async function checkUpdate() {
     checkingUpdate = true;
     try {
       const result = await api.checkClientUpdate();
       if (result.updateAvailable) {
         notify(`${$_('settings.updateAvailable')}: ${result.latestVersion}`, 'info');
-        await openUrl(result.releaseUrl);
+        await openExternalLink(result.releaseUrl);
       } else notify($_('settings.upToDate'), 'success');
     } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
     finally { checkingUpdate = false; }
@@ -127,11 +136,11 @@
 
   <div class="group panel">
     <h2><CircleHelp size={19}/>{$_('settings.help')}</h2>
-    <div class="setting"><div class="label"><CircleHelp size={20}/><div><strong>{$_('settings.openHelp')}</strong></div></div><button class="secondary-button" onclick={() => links && openUrl(links.help)}>{$_('common.open')}</button></div>
-    <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.provideFeedback')}</strong></div></div><button class="secondary-button" onclick={() => links && openUrl(links.feedback)}>{$_('common.open')}</button></div>
+    <div class="setting"><div class="label"><CircleHelp size={20}/><div><strong>{$_('settings.openHelp')}</strong></div></div><button class="secondary-button" onclick={() => openExternalLink(links?.help)}>{$_('common.open')}</button></div>
+    <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.provideFeedback')}</strong></div></div><button class="secondary-button" onclick={() => openExternalLink(links?.feedback)}>{$_('common.open')}</button></div>
   </div>
 
-  <div class="group panel about"><h2><Scale size={19}/>{$_('settings.about')}</h2><p>{$_('settings.aboutText')}</p><code>PowerPico Client 0.1.1 · GPL-3.0-only</code></div>
+  <div class="group panel about"><h2><Scale size={19}/>{$_('settings.about')}</h2><p>{$_('settings.aboutText')}</p><code>PowerPico Client 0.1.2 · GPL-3.0-only</code></div>
 </section>
 
 <style>

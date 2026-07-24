@@ -77,6 +77,55 @@ fn wait_for(
     Err(CoreError::Timeout(format!("waiting for 0x{expected:02x}")))
 }
 
+fn repeated_byte_seen(byte: u8, expected: u8, consecutive: &mut usize, required: usize) -> bool {
+    if byte == expected {
+        *consecutive += 1;
+    } else {
+        *consecutive = 0;
+    }
+    *consecutive >= required
+}
+
+fn wait_for_repeated(
+    port: &mut dyn SerialPort,
+    expected: u8,
+    required: usize,
+    timeout: Duration,
+    max_garbage: usize,
+    cancel: &AtomicBool,
+) -> CoreResult<()> {
+    let started = Instant::now();
+    let mut garbage = 0;
+    let mut consecutive = 0;
+    let mut byte = [0u8; 1];
+    while started.elapsed() < timeout {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = port.write_all(&[CAN, CAN]);
+            return Err(CoreError::Cancelled);
+        }
+        match port.read(&mut byte) {
+            Ok(1) if repeated_byte_seen(byte[0], expected, &mut consecutive, required) => {
+                return Ok(())
+            }
+            Ok(1) if byte[0] == expected => {}
+            Ok(1) => {
+                garbage += 1;
+                if garbage > max_garbage {
+                    return Err(CoreError::Other(format!(
+                        "received too much unexpected data while waiting for {required} consecutive 0x{expected:02x} bytes"
+                    )));
+                }
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(error) => return Err(CoreError::Serial(error.to_string())),
+        }
+    }
+    Err(CoreError::Timeout(format!(
+        "waiting for {required} consecutive 0x{expected:02x} bytes"
+    )))
+}
+
 pub fn send_file(
     port: &mut dyn SerialPort,
     path: &Path,
@@ -89,7 +138,11 @@ pub fn send_file(
         .and_then(|value| value.to_str())
         .ok_or_else(|| CoreError::Other("invalid firmware filename".into()))?;
     port.clear(serialport::ClearBuffer::Input)?;
-    wait_for(port, CRC_C, Duration::from_secs(60), 500, &cancel)?;
+    // The STM32 IAP bootloader logs "Erase Complete" immediately before
+    // starting YMODEM. A single-byte search mistakes the C in "Complete" for
+    // the protocol's CRC request and sends the header too early. The receiver
+    // repeats CRC_C while idle, so require two consecutive requests here.
+    wait_for_repeated(port, CRC_C, 2, Duration::from_secs(60), 500, &cancel)?;
     let mut header = vec![0u8; 128];
     let metadata = format!("{file_name}\0{file_size}");
     if metadata.len() > header.len() {
@@ -166,5 +219,21 @@ mod tests {
             u16::from_be_bytes(bytes[131..133].try_into().unwrap()),
             crc16(&block)
         );
+    }
+
+    #[test]
+    fn initial_crc_wait_ignores_the_c_in_erase_complete_log() {
+        let stream =
+            b"Erasing Application Area...\r\nErase Complete.\r\nStarting Ymodem Receive\r\nCC";
+        let mut consecutive = 0;
+        let matches: Vec<_> = stream
+            .iter()
+            .enumerate()
+            .filter_map(|(index, byte)| {
+                repeated_byte_seen(*byte, CRC_C, &mut consecutive, 2).then_some(index)
+            })
+            .collect();
+
+        assert_eq!(matches, vec![stream.len() - 1]);
     }
 }

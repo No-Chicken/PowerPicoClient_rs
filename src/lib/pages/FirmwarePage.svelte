@@ -57,9 +57,18 @@
       else await api.cancelFlash();
     } catch (error) { notify(errorMessage(error), 'error'); }
   }
+  async function loadExternalLinks() {
+    try { links = await api.externalLinks(); }
+    catch { notify($_('errors.externalLink'), 'error'); }
+  }
+  async function openExternalLink(url?: string) {
+    if (!url) return notify($_('errors.externalLink'), 'error');
+    try { await openUrl(url); }
+    catch { notify($_('errors.externalLink'), 'error'); }
+  }
 
   onMount(async () => {
-    await Promise.all([refreshDevices(), refreshOfficial(), api.externalLinks().then((value) => links = value)]);
+    await Promise.all([refreshDevices(), refreshOfficial(), loadExternalLinks()]);
     unlisteners.push(await onEvent<FirmwareProgress>('firmware-progress', (value) => { progress = value; }));
     unlisteners.push(await onEvent<FirmwareProgress>('firmware-finished', (value) => {
       progress = value;
@@ -93,7 +102,7 @@
         <div><strong>{$_('firmware.latest')}: {official?.version || '—'}</strong><span>{$_('firmware.releaseDate')}: {official?.releaseDate || '—'}</span></div>
         <button class="secondary-button" onclick={refreshOfficial} disabled={busy || loadingOfficial}><RefreshCw size={17}/>{$_('common.refresh')}</button>
         <button class="primary-button" onclick={downloadLatest} disabled={busy || !official}><Download size={17}/>{$_('firmware.downloadLatest')}</button>
-        <button class="secondary-button" onclick={() => links && openUrl(links.firmwareReleaseNotes)}><ExternalLink size={17}/>{$_('firmware.releaseNotes')}</button>
+        <button class="secondary-button" onclick={() => openExternalLink(links?.firmwareReleaseNotes)}><ExternalLink size={17}/>{$_('firmware.releaseNotes')}</button>
       </div>
     {:else}
       <label><span>{$_('firmware.file')}</span><div class="row"><div class="file control"><FileCode2 size={17}/><span>{settings.customFirmwarePath || $_('firmware.choose')}</span></div><button class="secondary-button" onclick={chooseFile} disabled={busy}>{$_('common.browse')}</button></div></label>

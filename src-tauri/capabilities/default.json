@@ -3,5 +3,18 @@
   "identifier": "default",
   "description": "Default desktop capabilities",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save", "opener:allow-open-url"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://no-chicken.com/content/Power-Pico/others/release_note.html" },
+        { "url": "https://no-chicken.com/content/Power-Pico/intro.html" },
+        { "url": "https://no-chicken.com/content/discuss_groups.html" },
+        { "url": "https://github.com/No-Chicken/PowerPicoClient_rs/releases/*" }
+      ]
+    }
+  ]
 }

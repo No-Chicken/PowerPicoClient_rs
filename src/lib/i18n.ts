@@ -11,6 +11,7 @@ export const zh = {
   },
   errors: {
     serialPermission: '没有串口访问权限。Debian/Ubuntu 请将当前用户加入 dialout 组，Arch Linux 请加入 uucp 组，然后注销并重新登录。',
+    externalLink: '无法打开外部链接，请检查系统默认浏览器设置后重试。',
   },
   waveform: {
     title: '实时波形', subtitle: '采集、查看并导出 PowerPico 测量数据', selectDevice: '选择串口设备',
@@ -64,6 +65,7 @@ export const en = {
   },
   errors: {
     serialPermission: 'Serial access was denied. Add your user to dialout on Debian/Ubuntu or uucp on Arch Linux, then sign out and back in.',
+    externalLink: 'Could not open the external link. Check your default browser settings and try again.',
   },
   waveform: {
     title: 'Live waveform', subtitle: 'Capture, inspect and export PowerPico measurements', selectDevice: 'Select serial device',
@@ -112,6 +114,7 @@ export const zhHk = {
   app: { ...zh.app, connected: '裝置已連線', disconnected: '未連線' },
   nav: { waveform: '波形', firmware: '韌體', settings: '設定' },
   common: { ...zh.common, import: '匯入', export: '匯出', clear: '清除' },
+  errors: { ...zh.errors, externalLink: '無法開啟外部連結，請檢查系統預設瀏覽器設定後重試。' },
   settings: { ...zh.settings, title: '設定', language: '介面語言', about: '關於開源版本' },
   firmware: { ...zh.firmware, title: '韌體升級', official: '官方韌體', custom: '自訂韌體' },
 };
@@ -121,6 +124,7 @@ export const ja = {
   app: { name: 'PowerPico Client', connected: 'デバイス接続済み', disconnected: '未接続' },
   nav: { waveform: '波形', firmware: 'ファームウェア', settings: '設定' },
   common: { ...en.common, refresh: '更新', connect: '接続', disconnect: '切断', clear: 'クリア', cancel: 'キャンセル' },
+  errors: { ...en.errors, externalLink: '外部リンクを開けませんでした。既定のブラウザ設定を確認して再試行してください。' },
   settings: { ...en.settings, title: '設定', language: '表示言語', appearance: '外観', update: 'ソフトウェア更新', help: 'ヘルプ' },
   firmware: { ...en.firmware, title: 'ファームウェア更新', official: '公式ファームウェア', custom: 'カスタムファームウェア' },
   waveform: { ...en.waveform, title: 'リアルタイム波形', voltage: '電圧', current: '電流', analyze: '範囲解析' },
