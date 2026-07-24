@@ -32,6 +32,20 @@ export interface CaptureSummary {
   energyMah: number;
 }
 
+export interface RangeStatistics {
+  start: number;
+  end: number;
+  duration: number;
+  pointCount: number;
+  voltageAverage: number;
+  voltagePeak: number;
+  currentAverage: number;
+  currentPeak: number;
+  powerAverageMw: number;
+  powerPeakMw: number;
+  energyMah: number;
+}
+
 export interface PointReading {
   time: number;
   voltage: number;
@@ -67,11 +81,40 @@ export type FirmwareStage =
 export interface FirmwareProgress {
   stage: FirmwareStage;
   percent: number;
-  message: string;
+  messageKey: string;
+  detail?: string;
+}
+
+export interface OfficialFirmwareInfo {
+  version: string;
+  releaseDate: string;
+  url: string;
+  localPath?: string;
+  downloaded: boolean;
+}
+
+export interface FirmwareDownloadProgress {
+  percent: number;
+  stage: 'downloading' | 'completed' | 'cancelled' | 'failed';
+  detail?: string;
+}
+
+export interface ClientUpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  releaseUrl: string;
+  updateAvailable: boolean;
+}
+
+export interface ExternalLinks {
+  help: string;
+  feedback: string;
+  firmwareReleaseNotes: string;
 }
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type Language = 'zh-CN' | 'en';
+export type Language = 'auto' | 'zh-CN' | 'zh-HK' | 'en' | 'ja';
+export type FirmwareMode = 'official' | 'custom';
 export type MetricId =
   | 'latestVoltage'
   | 'averageVoltage'
@@ -89,6 +132,13 @@ export interface AppSettings {
   theme: ThemeMode;
   language: Language;
   waveformMetrics: MetricId[];
+  uiScale: 0 | 100 | 125 | 150 | 175 | 200;
+  checkUpdateAtStartup: boolean;
+  antiAliasing: boolean;
+  firmwareMode: FirmwareMode;
+  customFirmwarePath: string;
+  localFirmwareVersion: string;
+  localFirmwareReleaseDate: string;
 }
 
 export interface AppError {

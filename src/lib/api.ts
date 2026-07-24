@@ -5,9 +5,13 @@ import type {
   AppError,
   CaptureState,
   CaptureSummary,
+  ClientUpdateInfo,
+  ExternalLinks,
+  OfficialFirmwareInfo,
   FirmwareProgress,
   PointReading,
   RenderSeries,
+  RangeStatistics,
   SerialDevice,
 } from './types';
 
@@ -19,6 +23,8 @@ export const api = {
   renderData: (start: number, end: number, pixelWidth: number) =>
     invoke<RenderSeries>('get_render_data', { start, end, pixelWidth }),
   stats: (windowSeconds?: number) => invoke<CaptureSummary>('get_stats', { windowSeconds }),
+  rangeStats: (start: number, end: number) =>
+    invoke<RangeStatistics>('get_range_stats', { start, end }),
   pointAt: (timeSeconds: number) => invoke<PointReading>('get_point_at', { timeSeconds }),
   clearRecords: () => invoke<void>('clear_records'),
   importRecording: (path: string) => invoke<CaptureState>('import_recording', { path }),
@@ -26,6 +32,12 @@ export const api = {
   flashFirmware: (deviceId: string, filePath: string) =>
     invoke<void>('flash_firmware', { deviceId, filePath }),
   cancelFlash: () => invoke<void>('cancel_flash'),
+  officialFirmwareInfo: () => invoke<OfficialFirmwareInfo>('get_official_firmware_info'),
+  downloadOfficialFirmware: (url: string, version: string, releaseDate: string) =>
+    invoke<void>('download_official_firmware', { url, version, releaseDate }),
+  cancelFirmwareDownload: () => invoke<void>('cancel_firmware_download'),
+  checkClientUpdate: () => invoke<ClientUpdateInfo>('check_client_update'),
+  externalLinks: () => invoke<ExternalLinks>('external_links'),
   getSettings: () => invoke<AppSettings>('get_settings'),
   updateSettings: (settings: AppSettings) => invoke<AppSettings>('update_settings', { settings }),
 };

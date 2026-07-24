@@ -1,6 +1,6 @@
 # Linux 测试清单
 
-首版发布目标为 Ubuntu/Debian x86_64。日常开发和真机调试在 Arch Linux x86_64 上执行，DEB/AppImage 只通过 Ubuntu 22.04 容器生成。
+发布目标为 Ubuntu/Debian x86_64。日常开发和真机调试可在 Arch Linux x86_64 上执行；本地 DEB/AppImage 使用 Ubuntu 22.04 容器生成，GitHub Actions 则在 Ubuntu 22.04 runner 原生构建。
 
 ## 自动检查
 

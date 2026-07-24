@@ -1,11 +1,7 @@
 # Third-party notices
 
-The Tauri rewrite uses open-source dependencies distributed under permissive
-licenses. The authoritative license text for each resolved dependency is
-included with its package and recorded in `pnpm-lock.yaml` or `Cargo.lock`.
+PowerPico Client itself is distributed under GPL-3.0-only. Its JavaScript and Rust dependencies retain their respective licenses; the authoritative dependency versions are recorded in `pnpm-lock.yaml` and `src-tauri/Cargo.lock`.
 
-Major direct dependencies include Tauri, Svelte, Tailwind CSS, Lucide,
-shadcn-svelte-compatible local components, uPlot, serde, serialport and tracing.
+Major direct dependencies include Tauri, Svelte, Tailwind CSS, Lucide, uPlot, serde, reqwest, serialport and tracing. Linux packages also depend on system WebKitGTK and related desktop libraries provided by the target distribution.
 
-The proprietary QFluentWidgets Pro library used by the legacy Python client is
-not linked, copied or required by this application.
+The QFluentWidgets Pro library used by the legacy Python client is not linked, copied or packaged with this application. The legacy client is used only as a protocol and behavior reference.

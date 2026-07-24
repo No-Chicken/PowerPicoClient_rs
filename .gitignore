@@ -23,3 +23,6 @@ src-tauri/gen/schemas/
 *.swo
 .DS_Store
 Thumbs.db
+
+# 参考项目
+power_pico_pyqt

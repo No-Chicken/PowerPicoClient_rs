@@ -10,7 +10,7 @@
   import { formatCurrent, formatPower, metricById } from '../metrics';
   import { createRefreshScheduler } from '../refreshScheduler';
   import type {
-    AppSettings, CaptureState, CaptureSummary, PointReading, RenderSeries, SerialDevice,
+    AppSettings, CaptureState, CaptureSummary, PointReading, RangeStatistics, RenderSeries, SerialDevice,
   } from '../types';
   import {
     autoRange, exceedsDragThreshold, panRange, rangeSpan, zoomRange, type NumericRange,
@@ -29,12 +29,17 @@
     lastY: number;
     dragged: boolean;
     startedInPlot: boolean;
+    analysis: boolean;
   }
 
   let devices: SerialDevice[] = [];
   let selectedDevice = '';
   let state: CaptureState = { status: 'idle' };
   let summary: CaptureSummary = emptySummary();
+  let totalSummary: CaptureSummary = emptySummary();
+  let statsWindow: number | undefined = undefined;
+  let analysis: RangeStatistics | null = null;
+  let analysisDraft: NumericRange | null = null;
   let chartHost: HTMLDivElement;
   let chart: uPlot | undefined;
   let resizeObserver: ResizeObserver | undefined;
@@ -98,6 +103,7 @@
     try {
       state = await api.importRecording(path);
       summary = await api.stats();
+      totalSummary = summary;
       latestEnd = summary.duration;
       followLive = false;
       timeViewport = { min: 0, max: Math.max(summary.duration, 0.001) };
@@ -123,6 +129,9 @@
     try {
       await api.clearRecords();
       summary = emptySummary();
+      totalSummary = emptySummary();
+      analysis = null;
+      analysisDraft = null;
       state = await api.captureState();
       latestEnd = 0;
       followLive = true;
@@ -136,12 +145,12 @@
   }
 
   function liveRange(): NumericRange {
-    const end = Math.max(latestEnd, summary.duration);
+    const end = Math.max(latestEnd, totalSummary.duration);
     return { min: Math.max(0, end - 10), max: Math.max(10, end) };
   }
 
   function timeBounds(): NumericRange | undefined {
-    const end = Math.max(latestEnd, summary.duration, currentSeries.availableEnd);
+    const end = Math.max(latestEnd, totalSummary.duration, currentSeries.availableEnd);
     if (end <= 0) return undefined;
     return { min: Math.min(0, currentSeries.availableStart), max: end };
   }
@@ -179,8 +188,8 @@
       ],
       series: [
         {},
-        { label: 'Voltage', scale: 'voltage', stroke: '#ef565d', width: 1.5 },
-        { label: 'Current', scale: 'current', stroke: '#2887f0', width: 1.5 },
+        { label: 'Voltage', scale: 'voltage', stroke: '#ef565d', width: 1.5, pxAlign: settings.antiAliasing ? 0 : 1 },
+        { label: 'Current', scale: 'current', stroke: '#2887f0', width: 1.5, pxAlign: settings.antiAliasing ? 0 : 1 },
       ],
       legend: { show: false },
       hooks: { draw: [drawSelection] },
@@ -234,6 +243,7 @@
     root.addEventListener('pointerup', handlePointerUp);
     root.addEventListener('pointercancel', () => dragState = null);
     root.addEventListener('dblclick', handleDoubleClick);
+    root.addEventListener('contextmenu', (event) => event.preventDefault());
   }
 
   function handleWheel(event: WheelEvent) {
@@ -264,12 +274,14 @@
   }
 
   function handlePointerDown(event: PointerEvent) {
-    if (event.button !== 0) return;
+    if (event.button !== 0 && event.button !== 2) return;
     const target = targetAt(event.clientX, event.clientY);
     if (!target) return;
+    const analysisDrag = event.button === 2 && target === 'time' && isInPlot(event.clientX, event.clientY);
     dragState = {
       target, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY,
       dragged: false, startedInPlot: isInPlot(event.clientX, event.clientY),
+      analysis: analysisDrag,
     };
     chart?.root.setPointerCapture(event.pointerId);
   }
@@ -282,6 +294,13 @@
     if (!dragState.dragged) return;
     const rect = geometry()?.overRect;
     if (!rect) return;
+    if (dragState.analysis) {
+      const first = chart.posToVal(Math.min(rect.width, Math.max(0, dragState.startX - rect.left)), 'x');
+      const second = chart.posToVal(Math.min(rect.width, Math.max(0, event.clientX - rect.left)), 'x');
+      analysisDraft = { min: Math.min(first, second), max: Math.max(first, second) };
+      chart.redraw();
+      return;
+    }
     const deltaX = event.clientX - dragState.lastX;
     const deltaY = event.clientY - dragState.lastY;
     if (dragState.target === 'time') {
@@ -303,7 +322,49 @@
   function handlePointerUp(event: PointerEvent) {
     const completed = dragState;
     dragState = null;
-    if (!completed?.dragged && completed?.startedInPlot) void selectAtPointer(event.clientX);
+    if (completed?.analysis && completed.dragged && analysisDraft) {
+      void analyzeRange(analysisDraft.min, analysisDraft.max);
+      return;
+    }
+    if (!completed?.dragged && completed?.startedInPlot && event.button === 0) void selectAtPointer(event.clientX);
+  }
+
+  async function analyzeRange(start: number, end: number) {
+    if (end - start < 0.0001) return;
+    try {
+      analysis = await api.rangeStats(start, end);
+      analysisDraft = { min: start, max: end };
+      followLive = false;
+      chart?.redraw();
+    } catch (error) { notify(errorMessage(error), 'error'); }
+  }
+
+  async function refreshDisplayedStats() {
+    try { summary = await api.stats(statsWindow); } catch { /* no recording */ }
+  }
+
+  function navigateTo(value: number) {
+    const bounds = timeBounds();
+    if (!bounds) return;
+    const span = rangeSpan(timeViewport);
+    const end = Math.min(bounds.max, Math.max(bounds.min + span, value));
+    timeViewport = { min: Math.max(bounds.min, end - span), max: end };
+    followLive = false;
+    applyScale('x', timeViewport);
+    scheduleRefresh();
+  }
+
+  function changeStatsWindow(value: string) {
+    statsWindow = value === 'global' ? undefined : Number(value);
+    void refreshDisplayedStats();
+  }
+
+  function updateAnalysisBoundary(which: 'min' | 'max', value: number) {
+    const current = analysisDraft ?? timeViewport;
+    const next = { ...current, [which]: value };
+    if (next.max - next.min < 0.0001) return;
+    analysisDraft = next;
+    void analyzeRange(next.min, next.max);
   }
 
   function handleDoubleClick(event: MouseEvent) {
@@ -350,8 +411,18 @@
   }
 
   function drawSelection(instance: uPlot) {
-    if (!selectedPoint || !selectedVisible()) return;
     const { ctx, bbox } = instance;
+    if (analysisDraft) {
+      const left = instance.valToPos(analysisDraft.min, 'x', true);
+      const right = instance.valToPos(analysisDraft.max, 'x', true);
+      ctx.save();
+      ctx.fillStyle = 'rgba(164, 104, 224, .16)';
+      ctx.strokeStyle = 'rgba(164, 104, 224, .75)';
+      ctx.fillRect(left, bbox.top, right - left, bbox.height);
+      ctx.strokeRect(left, bbox.top, right - left, bbox.height);
+      ctx.restore();
+    }
+    if (!selectedPoint || !selectedVisible()) return;
     const x = instance.valToPos(selectedPoint.time, 'x', true);
     const voltageY = instance.valToPos(selectedPoint.voltage, 'voltage', true);
     const currentY = instance.valToPos(selectedPoint.current, 'current', true);
@@ -441,11 +512,12 @@
     if (state.deviceId) selectedDevice = state.deviceId;
     try {
       summary = await api.stats();
-      latestEnd = summary.duration;
+      totalSummary = summary;
+      latestEnd = totalSummary.duration;
       if (state.status === 'capturing') timeViewport = liveRange();
-      else if (summary.duration > 0) {
+      else if (totalSummary.duration > 0) {
         followLive = false;
-        timeViewport = { min: 0, max: summary.duration };
+        timeViewport = { min: 0, max: totalSummary.duration };
       }
     } catch { /* empty */ }
     unlisteners.push(await onEvent<CaptureState>('capture-state-changed', (value) => {
@@ -455,7 +527,9 @@
       if (started) returnToLive();
     }));
     unlisteners.push(await onEvent<CaptureSummary>('capture-summary-updated', (value) => {
-      summary = value;
+      totalSummary = value;
+      if (statsWindow === undefined) summary = value;
+      else void refreshDisplayedStats();
       latestEnd = value.duration;
       if (followLive && state.status === 'capturing') {
         timeViewport = liveRange();
@@ -480,6 +554,9 @@
   <header>
     <div><h1 class="page-title">{$_('waveform.title')}</h1><p class="page-subtitle">{$_('waveform.subtitle')}</p></div>
     <div class="toolbar">
+      <select class="control stats-select" onchange={(event) => changeStatsWindow((event.target as HTMLSelectElement).value)} aria-label={$_('waveform.statsMode')}>
+        <option value="global">{$_('waveform.globalStats')}</option><option value="600">{$_('waveform.tenMinuteStats')}</option><option value="60">{$_('waveform.minuteStats')}</option><option value="1">{$_('waveform.secondStats')}</option>
+      </select>
       <select class="control device" bind:value={selectedDevice} disabled={state.status === 'capturing'} aria-label={$_('waveform.selectDevice')}>
         <option value="">{$_('waveform.selectDevice')}</option>
         {#each devices as device}<option value={device.id}>{device.displayName}</option>{/each}
@@ -526,6 +603,27 @@
     </div>
   </div>
 
+  <div class="navigation panel">
+    <strong>{followLive ? $_('waveform.modeLive') : analysis ? $_('waveform.modeAnalysis') : $_('waveform.modeFrozen')}</strong>
+    <label><span>{$_('waveform.viewport')}</span><input type="range" min="0" max={Math.max(totalSummary.duration, 0.001)} step="0.001" value={timeViewport.max} oninput={(event) => navigateTo(Number((event.target as HTMLInputElement).value))}/></label>
+    {#if analysisDraft}
+      <label><span>{$_('waveform.rangeStart')}</span><input type="range" min="0" max={Math.max(totalSummary.duration, 0.001)} step="0.001" value={analysisDraft.min} oninput={(event) => updateAnalysisBoundary('min', Number((event.target as HTMLInputElement).value))}/></label>
+      <label><span>{$_('waveform.rangeEnd')}</span><input type="range" min="0" max={Math.max(totalSummary.duration, 0.001)} step="0.001" value={analysisDraft.max} oninput={(event) => updateAnalysisBoundary('max', Number((event.target as HTMLInputElement).value))}/></label>
+    {/if}
+  </div>
+
+  {#if analysis}
+    <aside class="analysis panel">
+      <div class="analysis-heading"><strong>{$_('waveform.analysisTitle')}</strong><button onclick={() => { analysis = null; analysisDraft = null; chart?.redraw(); }} aria-label={$_('common.close')}><X size={16}/></button></div>
+      <div class="analysis-grid">
+        <div><span>{$_('waveform.startTime')}</span><strong>{analysis.start.toFixed(6)} s</strong></div><div><span>{$_('waveform.endTime')}</span><strong>{analysis.end.toFixed(6)} s</strong></div><div><span>{$_('metrics.duration')}</span><strong>{analysis.duration.toFixed(6)} s</strong></div>
+        <div><span>{$_('metrics.averageVoltage')}</span><strong>{analysis.voltageAverage.toFixed(4)} V</strong></div><div><span>{$_('metrics.peakVoltage')}</span><strong>{analysis.voltagePeak.toFixed(4)} V</strong></div>
+        <div><span>{$_('metrics.averageCurrent')}</span><strong>{formatCurrent(analysis.currentAverage)}</strong></div><div><span>{$_('metrics.peakCurrent')}</span><strong>{formatCurrent(analysis.currentPeak)}</strong></div>
+        <div><span>{$_('metrics.averagePower')}</span><strong>{formatPower(analysis.powerAverageMw)}</strong></div><div><span>{$_('waveform.powerPeak')}</span><strong>{formatPower(analysis.powerPeakMw)}</strong></div><div><span>{$_('metrics.energy')}</span><strong>{analysis.energyMah.toFixed(6)} mAh</strong></div>
+      </div>
+    </aside>
+  {/if}
+
   <footer>
     <button class="secondary-button" onclick={importRecording}><FolderInput size={17}/>{$_('common.import')}</button>
     <button class="secondary-button" onclick={exportRecording} disabled={!state.recordPath}><FolderOutput size={17}/>{$_('common.export')}</button>
@@ -535,12 +633,13 @@
 </section>
 
 <style>
-  .page { width: 100%; min-width: 0; height: 100%; display: grid; grid-template-rows: auto auto minmax(300px, 1fr) auto; gap: 16px; }
+  .page { width: 100%; min-width: 0; min-height: 100%; display: grid; grid-template-rows: auto auto minmax(300px, 1fr) auto auto auto; gap: 12px; }
   header, footer, .toolbar { display: flex; align-items: center; }
   header, footer, .toolbar, .metrics, .chart-card { min-width: 0; }
   header { justify-content: space-between; gap: 20px; }
   .toolbar { gap: 9px; }
   .device { width: min(310px, 30vw); }
+  .stats-select { width: 150px; }
   .icon { width: 38px; padding: 0; }
   .metrics { display: grid; grid-template-columns: repeat(6, minmax(110px, 1fr)); gap: 10px; }
   .chart-card { min-height: 0; border-radius: 18px; padding: 12px 16px 10px; display: flex; flex-direction: column; }
@@ -568,8 +667,19 @@
   .current-text { color: var(--current); }
   .power-text { color: var(--power); }
   footer { gap: 9px; }
+  .navigation { border-radius: 14px; padding: 10px 14px; display: grid; grid-template-columns: auto minmax(180px, 1fr); gap: 8px 16px; align-items: center; }
+  .navigation > strong { font-size: 12px; color: var(--accent); }
+  .navigation label { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .navigation label span { min-width: 78px; color: var(--muted); font-size: 11px; }
+  .navigation input { width: 100%; }
+  .analysis { border-radius: 14px; padding: 12px 14px; }
+  .analysis-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .analysis-heading button { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--muted); background: var(--panel-muted); }
+  .analysis-grid { display: grid; grid-template-columns: repeat(5, minmax(100px, 1fr)); gap: 8px; }
+  .analysis-grid div { padding: 8px 10px; border-radius: 9px; background: var(--panel-muted); }
+  .analysis-grid span, .analysis-grid strong { display: block; } .analysis-grid span { color: var(--muted); font-size: 10px; } .analysis-grid strong { margin-top: 3px; font-size: 12px; }
   .error { margin-left: auto; color: #d6444b; font-size: 13px; }
   @media (max-width: 1150px) { .metrics { grid-template-columns: repeat(3, minmax(110px, 1fr)); } .gesture-hint { display: none; } }
-  @media (max-width: 1050px) { header { align-items: stretch; flex-direction: column; gap: 12px; } .toolbar { width: 100%; } .device { width: auto; flex: 1; } .toolbar button { flex: 0 0 auto; white-space: nowrap; } }
+  @media (max-width: 1050px) { header { align-items: stretch; flex-direction: column; gap: 12px; } .toolbar { width: 100%; flex-wrap: wrap; } .device { width: auto; flex: 1; } .toolbar button { flex: 0 0 auto; white-space: nowrap; } .analysis-grid { grid-template-columns: repeat(3, minmax(100px, 1fr)); } }
   @media (max-width: 760px) { .metrics { grid-template-columns: repeat(2, minmax(110px, 1fr)); } .chart-action { font-size: 0; } }
 </style>

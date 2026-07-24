@@ -16,11 +16,16 @@
   let page: Page = 'waveform';
   let connected = false;
   let settings: AppSettings = {
-    theme: 'system', language: 'zh-CN',
+    theme: 'system', language: 'auto',
     waveformMetrics: [...defaultWaveformMetrics],
+    uiScale: 0, checkUpdateAtStartup: true, antiAliasing: false,
+    firmwareMode: 'official', customFirmwarePath: '',
+    localFirmwareVersion: '', localFirmwareReleaseDate: '',
   };
   let toast = { message: '', tone: 'info' as 'info' | 'error' | 'success' };
   let unlistenCapture: UnlistenFn | undefined;
+  let media: MediaQueryList | undefined;
+  const mediaChanged = () => { if (settings.theme === 'system') applyTheme('system'); };
 
   function notify(message: string, tone: 'info' | 'error' | 'success' = 'info') {
     toast = { message, tone };
@@ -32,23 +37,33 @@
     document.documentElement.classList.toggle('dark', dark);
   }
 
+  function applyScale(scale: AppSettings['uiScale']) {
+    document.documentElement.style.zoom = scale ? String(scale / 100) : '1';
+  }
+
   async function updateSettings(next: AppSettings) {
     settings = await api.updateSettings(next);
     setLocale(settings.language);
     applyTheme(settings.theme);
+    applyScale(settings.uiScale);
   }
 
   onMount(async () => {
     try {
       settings = await api.getSettings();
-      setLocale(settings.language); applyTheme(settings.theme);
+      setLocale(settings.language); applyTheme(settings.theme); applyScale(settings.uiScale);
       const state = await api.captureState(); connected = state.status === 'capturing';
       unlistenCapture = await onEvent<{ status: string }>('capture-state-changed', (next) => { connected = next.status === 'capturing'; });
-      const media = matchMedia('(prefers-color-scheme: dark)');
-      media.addEventListener('change', () => { if (settings.theme === 'system') applyTheme('system'); });
+      media = matchMedia('(prefers-color-scheme: dark)');
+      media.addEventListener('change', mediaChanged);
+      if (settings.checkUpdateAtStartup) {
+        api.checkClientUpdate().then((update) => {
+          if (update.updateAvailable) notify(`${$_('settings.updateAvailable')}: ${update.latestVersion}`);
+        }).catch(() => undefined);
+      }
     } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
   });
-  onDestroy(() => unlistenCapture?.());
+  onDestroy(() => { unlistenCapture?.(); media?.removeEventListener('change', mediaChanged); });
 </script>
 
 <div class="shell">
@@ -62,7 +77,7 @@
     <div class="connection"><StatusDot active={connected}/><span>{connected ? $_('app.connected') : $_('app.disconnected')}</span></div>
   </aside>
   <main>
-    {#if page === 'waveform'}<WaveformPage {notify} {settings}/>{:else if page === 'firmware'}<FirmwarePage {notify}/>{:else}<SettingsPage {settings} update={updateSettings}/>{/if}
+    {#if page === 'waveform'}<WaveformPage {notify} {settings}/>{:else if page === 'firmware'}<FirmwarePage {notify} {settings} updateSettings={updateSettings}/>{:else}<SettingsPage {settings} update={updateSettings} {notify}/>{/if}
   </main>
 </div>
 <Toast message={toast.message} tone={toast.tone} onClose={() => toast = { ...toast, message: '' }}/>
