@@ -95,13 +95,15 @@ chmod +x PowerPico-Client_<版本>_amd64.AppImage
 
 状态说明：✅ 已实现并纳入发布测试　🚧 计划支持、尚未完成　⚠️ 已实现但存在平台限制　➖ 当前不计划支持或不适用
 
-| 平台 | 数据采集与波形 | 记录导入导出 | 设备固件升级 | 缓存管理 | 应用内卸载 | 客户端 OTA | 发布包 |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| macOS 11+ / Apple Silicon | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ DMG（未签名/未公证）、✅ OTA 包 |
-| Ubuntu / Debian / x86_64 | ✅ | ✅ | ✅ | ✅ | ➖ | 🚧 | ✅ DEB、AppImage |
-| Windows / x86_64 | 🚧 | 🚧 | 🚧 | 🚧 | 🚧 | 🚧 | 🚧 MSI/NSIS |
-| macOS / Intel | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
-| Linux / ARM64 | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
+| 功能 | macOS 11+ / Apple Silicon | Ubuntu / Debian / x86_64 | Windows / x86_64 |
+| :--- | :---: | :---: | :---: |
+| 数据采集与波形 | ✅ | ✅ | 🚧 |
+| 记录导入导出 | ✅ | ✅ | 🚧 |
+| 设备固件升级 | ✅ | ✅ | 🚧 |
+| 缓存管理 | ✅ | ✅ | 🚧 |
+| 应用内卸载 | ✅ | ➖ | 🚧 |
+| 客户端 OTA | ✅ | 🚧 | 🚧 |
+| 发布包 | ⚠️ DMG（未签名/未公证）、✅ OTA 包 | ✅ DEB、AppImage | 🚧 MSI/NSIS |
 
 macOS DMG 当前未进行 Apple Developer ID 签名和公证，因此首次启动可能需要通过 Finder 手动确认。DEB 包基于 Ubuntu 22.04 构建，理论上可用于 Debian 11+、Ubuntu 22.04+、Linux Mint 21+；AppImage 可在多数 x86_64 Linux 发行版运行。RPM 当前不在发布计划内。
 
