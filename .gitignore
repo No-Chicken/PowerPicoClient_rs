@@ -26,3 +26,5 @@ Thumbs.db
 
 # 参考项目
 power_pico_pyqt
+.tauri-signing-private.key
+.tauri-signing-private.key.pub

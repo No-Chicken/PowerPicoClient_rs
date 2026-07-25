@@ -150,6 +150,29 @@ pub struct ClientUpdateInfo {
     pub update_available: bool,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsage {
+    pub cache_bytes: u64,
+    pub app_data_bytes: u64,
+    pub log_bytes: u64,
+    pub total_bytes: u64,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UninstallInfo {
+    pub supported: bool,
+    pub app_path: Option<String>,
+    pub app_bytes: u64,
+    pub cache_bytes: u64,
+    pub app_data_bytes: u64,
+    pub log_bytes: u64,
+    pub system_data_bytes: u64,
+    pub total_bytes: u64,
+    pub mounted_volumes: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ThemeMode {

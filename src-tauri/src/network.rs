@@ -128,6 +128,13 @@ impl Default for DownloadManager {
 }
 
 impl DownloadManager {
+    pub fn is_running(&self) -> bool {
+        self.thread
+            .lock()
+            .as_ref()
+            .is_some_and(|handle| !handle.is_finished())
+    }
+
     pub fn start(
         &self,
         app: AppHandle,
@@ -137,12 +144,7 @@ impl DownloadManager {
         app_data: PathBuf,
         settings: SettingsStore,
     ) -> CoreResult<()> {
-        if self
-            .thread
-            .lock()
-            .as_ref()
-            .is_some_and(|handle| !handle.is_finished())
-        {
+        if self.is_running() {
             return Err(CoreError::DeviceBusy);
         }
         if !url.starts_with("https://") {

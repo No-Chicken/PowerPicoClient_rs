@@ -26,11 +26,20 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["app", "dmg"],
     "category": "Utility",
     "shortDescription": "PowerPico measurement and firmware client",
     "longDescription": "Open-source desktop client for capturing PowerPico measurements and flashing firmware.",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "macOS": { "minimumSystemVersion": "11.0" }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5QUZFMzkyNjY1ODY2OQpSV1JwaG1VbU9mNmFDMFBNd1o0OTFIY0VpMjB2ZU1ndGdydWRUaEdlVlJCeEI2alFNVVdpaHdKdAo="
+    }
   }
 }

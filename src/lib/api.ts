@@ -13,6 +13,8 @@ import type {
   RenderSeries,
   RangeStatistics,
   SerialDevice,
+  StorageUsage,
+  UninstallInfo,
 } from './types';
 
 export const api = {
@@ -40,6 +42,11 @@ export const api = {
   externalLinks: () => invoke<ExternalLinks>('external_links'),
   getSettings: () => invoke<AppSettings>('get_settings'),
   updateSettings: (settings: AppSettings) => invoke<AppSettings>('update_settings', { settings }),
+  storageUsage: () => invoke<StorageUsage>('get_storage_usage'),
+  clearAppCache: () => invoke<StorageUsage>('clear_app_cache'),
+  uninstallInfo: () => invoke<UninstallInfo>('get_uninstall_info'),
+  setClientUpdateBusy: (busy: boolean) => invoke<void>('set_client_update_busy', { busy }),
+  uninstallApp: () => invoke<void>('uninstall_app'),
 };
 
 export function onEvent<T>(name: string, callback: (payload: T) => void): Promise<UnlistenFn> {

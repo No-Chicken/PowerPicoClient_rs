@@ -2,14 +2,18 @@
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { openUrl } from '@tauri-apps/plugin-opener';
+  import { check, type Update } from '@tauri-apps/plugin-updater';
+  import { relaunch } from '@tauri-apps/plugin-process';
   import {
     ArrowDown, ArrowUp, ChartNoAxesCombined, GripVertical, Languages,
-    CircleHelp, ExternalLink, MonitorCog, Palette, Plus, RefreshCw, Scale, X,
+    CircleHelp, Download, ExternalLink, HardDrive, MonitorCog, Palette, Plus,
+    RefreshCw, Scale, Trash2, X,
   } from '@lucide/svelte';
   import { api, formatAppError } from '../api';
   import { metricById, metricCatalog } from '../metrics';
   import { addMetric as addMetricToLayout, moveMetric as moveMetricInLayout, removeMetric as removeMetricFromLayout, reorderMetric } from '../metricLayout';
-  import type { AppSettings, ExternalLinks, Language, MetricId, ThemeMode } from '../types';
+  import { formatBytes } from '../storageFormat';
+  import type { AppSettings, ExternalLinks, Language, MetricId, StorageUsage, ThemeMode, UninstallInfo } from '../types';
 
   export let settings: AppSettings;
   export let update: (settings: AppSettings) => Promise<void>;
@@ -18,10 +22,22 @@
   let draggedMetric: MetricId | null = null;
   let links: ExternalLinks | null = null;
   let checkingUpdate = false;
+  let updateInfo: Update | null = null;
+  let updateStatus: 'idle' | 'downloading' | 'installing' | 'cancelled' | 'failed' = 'idle';
+  let updatePercent = 0;
+  let updateDownloaded = 0;
+  let updateTotal = 0;
+  let updateCancelled = false;
+  let storage: StorageUsage | null = null;
+  let uninstallInfo: UninstallInfo | null = null;
+  let refreshingStorage = false;
+  let clearingCache = false;
+  let uninstalling = false;
 
   onMount(async () => {
     try { links = await api.externalLinks(); }
     catch { notify($_('errors.externalLink'), 'error'); }
+    await refreshStorage();
   });
 
   function themeChanged(event: Event) {
@@ -45,13 +61,90 @@
   async function checkUpdate() {
     checkingUpdate = true;
     try {
-      const result = await api.checkClientUpdate();
-      if (result.updateAvailable) {
-        notify(`${$_('settings.updateAvailable')}: ${result.latestVersion}`, 'info');
-        await openExternalLink(result.releaseUrl);
-      } else notify($_('settings.upToDate'), 'success');
+      await updateInfo?.close();
+      updateInfo = await check({ timeout: 20_000 });
+      updateStatus = 'idle'; updatePercent = 0;
+      if (updateInfo) notify(`${$_('settings.updateAvailable')}: ${updateInfo.version}`, 'info');
+      else notify($_('settings.upToDate'), 'success');
     } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
     finally { checkingUpdate = false; }
+  }
+
+  async function installUpdate() {
+    if (!updateInfo) return;
+    updateStatus = 'downloading'; updateDownloaded = 0; updateTotal = 0; updatePercent = 0;
+    updateCancelled = false;
+    try {
+      await api.setClientUpdateBusy(true);
+      await updateInfo.download((event) => {
+        if (event.event === 'Started') updateTotal = event.data.contentLength || 0;
+        else if (event.event === 'Progress') {
+          updateDownloaded += event.data.chunkLength;
+          updatePercent = updateTotal ? Math.min(100, Math.round(updateDownloaded * 100 / updateTotal)) : 0;
+        } else if (event.event === 'Finished') updatePercent = 100;
+      }, { timeout: 120_000 });
+      updateStatus = 'installing';
+      await updateInfo.install();
+      await relaunch();
+    } catch (error) {
+      if (!updateCancelled) {
+        updateStatus = 'failed';
+        notify(formatAppError(error, $_('errors.serialPermission')), 'error');
+      }
+    } finally {
+      await api.setClientUpdateBusy(false).catch(() => undefined);
+    }
+  }
+
+  async function cancelUpdate() {
+    updateCancelled = true;
+    updateStatus = 'cancelled';
+    await updateInfo?.close().catch(() => undefined);
+    updateInfo = null;
+    await api.setClientUpdateBusy(false).catch(() => undefined);
+    notify($_('settings.updateCancelled'));
+  }
+
+  async function refreshStorage() {
+    refreshingStorage = true;
+    try {
+      [storage, uninstallInfo] = await Promise.all([api.storageUsage(), api.uninstallInfo()]);
+    } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
+    finally { refreshingStorage = false; }
+  }
+
+  async function clearCache() {
+    if (!confirm($_('settings.confirmClearCache'))) return;
+    clearingCache = true;
+    try {
+      storage = await api.clearAppCache();
+      uninstallInfo = await api.uninstallInfo();
+      notify($_('settings.cacheCleared'), 'success');
+    } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
+    finally { clearingCache = false; }
+  }
+
+  function uninstallSummary(info: UninstallInfo): string {
+    return [
+      $_('settings.confirmUninstall'), '',
+      `${$_('settings.application')}: ${formatBytes(info.appBytes)}`,
+      `${$_('settings.cache')}: ${formatBytes(info.cacheBytes)}`,
+      `${$_('settings.appData')}: ${formatBytes(info.appDataBytes)}`,
+      `${$_('settings.logs')}: ${formatBytes(info.logBytes)}`,
+      `${$_('settings.systemData')}: ${formatBytes(info.systemDataBytes)}`,
+      `${$_('settings.total')}: ${formatBytes(info.totalBytes)}`,
+      info.mountedVolumes.length ? `\n${$_('settings.volumesToEject')}:\n${info.mountedVolumes.join('\n')}` : '',
+    ].join('\n');
+  }
+
+  async function uninstall() {
+    if (!uninstallInfo?.supported || !confirm(uninstallSummary(uninstallInfo))) return;
+    uninstalling = true;
+    try { await api.uninstallApp(); }
+    catch (error) {
+      uninstalling = false;
+      notify(formatAppError(error, $_('errors.serialPermission')), 'error');
+    }
   }
 
   function saveMetrics(waveformMetrics: MetricId[]) {
@@ -92,7 +185,26 @@
   <div class="group panel">
     <h2><RefreshCw size={19}/>{$_('settings.update')}</h2>
     <div class="setting"><div class="label"><RefreshCw size={20}/><div><strong>{$_('settings.checkAtStartup')}</strong></div></div><input type="checkbox" checked={settings.checkUpdateAtStartup} onchange={(event) => settingChanged('checkUpdateAtStartup', (event.target as HTMLInputElement).checked)}/></div>
-    <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.checkNow')}</strong></div></div><button class="secondary-button" onclick={checkUpdate} disabled={checkingUpdate}>{$_('settings.checkNow')}</button></div>
+    <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.checkNow')}</strong></div></div><button class="secondary-button" onclick={checkUpdate} disabled={checkingUpdate || updateStatus === 'downloading' || updateStatus === 'installing'}>{checkingUpdate ? $_('settings.checking') : $_('settings.checkNow')}</button></div>
+    {#if updateInfo}
+      <div class="update-card">
+        <div><strong>{$_('settings.updateAvailable')}: {updateInfo.version}</strong>{#if updateInfo.body}<p>{updateInfo.body}</p>{/if}</div>
+        {#if updateStatus === 'downloading' || updateStatus === 'installing'}
+          <div class="update-progress"><div><span>{updateStatus === 'installing' ? $_('settings.installing') : $_('settings.downloadingUpdate')}</span><span>{updatePercent}%</span></div><div class="track"><div class="bar" style:width={`${updatePercent}%`}></div></div></div>
+          <button class="secondary-button" onclick={cancelUpdate} disabled={updateStatus === 'installing'}>{$_('common.cancel')}</button>
+        {:else}
+          <button class="primary-button" onclick={installUpdate}><Download size={17}/>{$_('settings.downloadInstall')}</button>
+        {/if}
+      </div>
+    {/if}
+  </div>
+
+  <div class="group panel">
+    <h2><HardDrive size={19}/>{$_('settings.storage')}</h2>
+    <div class="setting"><div class="label"><HardDrive size={20}/><div><strong>{$_('settings.cache')}</strong><span>{storage ? formatBytes(storage.cacheBytes) : '—'}</span></div></div><div class="button-row"><button class="secondary-button" onclick={refreshStorage} disabled={refreshingStorage || clearingCache}>{$_('common.refresh')}</button><button class="secondary-button" onclick={clearCache} disabled={refreshingStorage || clearingCache}>{clearingCache ? $_('settings.cleaning') : $_('settings.clearCache')}</button></div></div>
+    {#if uninstallInfo?.supported}
+      <div class="setting danger-setting"><div class="label"><Trash2 size={20}/><div><strong>{$_('settings.uninstall')}</strong><span>{$_('settings.uninstallHint')} · {formatBytes(uninstallInfo.totalBytes)}</span></div></div><button class="danger-button" onclick={uninstall} disabled={uninstalling}>{uninstalling ? $_('settings.uninstalling') : $_('settings.uninstall')}</button></div>
+    {/if}
   </div>
 
   <div class="group panel metrics-setting">
@@ -167,6 +279,15 @@
   .available-list { display: flex; flex-wrap: wrap; gap: 8px; }
   .add-metric { min-height: 34px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: 9px; background: var(--accent-soft); }
   .all-visible { color: var(--muted); font-size: 12px; }
+  .button-row { display: flex; gap: 8px; }
+  .danger-setting strong { color: #d6444b; }
+  .update-card { display: flex; align-items: center; gap: 16px; padding: 14px; border-radius: 12px; background: var(--panel-muted); }
+  .update-card > div:first-child { min-width: 0; flex: 1; }
+  .update-card p { max-height: 72px; margin: 5px 0 0; overflow: auto; white-space: pre-wrap; color: var(--muted); font-size: 12px; }
+  .update-progress { width: min(280px, 38%); }
+  .update-progress > div:first-child { display: flex; justify-content: space-between; margin-bottom: 7px; font-size: 12px; }
+  .track { height: 7px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--muted) 18%, transparent); }
+  .bar { height: 100%; border-radius: inherit; background: var(--accent); transition: width .15s ease; }
   .about p { font-size: 13px; }
   code { display: inline-block; margin-top: 8px; color: var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 7px 10px; }
   @media (max-width: 850px) { .metric-preview { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -106,6 +106,25 @@ export interface ClientUpdateInfo {
   updateAvailable: boolean;
 }
 
+export interface StorageUsage {
+  cacheBytes: number;
+  appDataBytes: number;
+  logBytes: number;
+  totalBytes: number;
+}
+
+export interface UninstallInfo {
+  supported: boolean;
+  appPath?: string;
+  appBytes: number;
+  cacheBytes: number;
+  appDataBytes: number;
+  logBytes: number;
+  systemDataBytes: number;
+  totalBytes: number;
+  mountedVolumes: string[];
+}
+
 export interface ExternalLinks {
   help: string;
   feedback: string;

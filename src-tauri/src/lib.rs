@@ -2,6 +2,7 @@ mod capture;
 mod device;
 mod error;
 mod firmware;
+mod maintenance;
 mod network;
 mod protocol;
 mod settings;
@@ -9,7 +10,11 @@ mod storage;
 mod types;
 mod ymodem;
 
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use tauri::{Manager, State};
 
@@ -20,7 +25,7 @@ use network::DownloadManager;
 use settings::SettingsStore;
 use types::{
     AppSettings, CaptureState, CaptureSummary, ClientUpdateInfo, OfficialFirmwareInfo,
-    PointReading, RangeStatistics, RenderSeries, SerialDevice,
+    PointReading, RangeStatistics, RenderSeries, SerialDevice, StorageUsage, UninstallInfo,
 };
 
 pub struct AppState {
@@ -30,6 +35,19 @@ pub struct AppState {
     settings: SettingsStore,
     app_data_dir: PathBuf,
     records_dir: PathBuf,
+    maintenance_paths: maintenance::MaintenancePaths,
+    client_update_busy: AtomicBool,
+}
+
+fn ensure_maintenance_idle(state: &AppState) -> Result<(), AppError> {
+    if state.capture.is_running()
+        || state.firmware.is_running()
+        || state.downloads.is_running()
+        || state.client_update_busy.load(Ordering::SeqCst)
+    {
+        return Err(CoreError::DeviceBusy.into());
+    }
+    Ok(())
 }
 
 fn command_error(error: CoreError) -> AppError {
@@ -220,15 +238,55 @@ fn update_settings(
     state.settings.update(settings).map_err(command_error)
 }
 
+#[tauri::command]
+fn get_storage_usage(state: State<'_, AppState>) -> CommandResult<StorageUsage> {
+    maintenance::storage_usage(&state.maintenance_paths).map_err(command_error)
+}
+
+#[tauri::command]
+fn clear_app_cache(state: State<'_, AppState>) -> CommandResult<StorageUsage> {
+    ensure_maintenance_idle(&state)?;
+    state
+        .capture
+        .clear(&state.records_dir)
+        .map_err(command_error)?;
+    maintenance::clear_directory_contents(&state.maintenance_paths.cache).map_err(command_error)?;
+    fs::create_dir_all(&state.records_dir)
+        .map_err(CoreError::from)
+        .map_err(command_error)?;
+    maintenance::storage_usage(&state.maintenance_paths).map_err(command_error)
+}
+
+#[tauri::command]
+fn get_uninstall_info(state: State<'_, AppState>) -> CommandResult<UninstallInfo> {
+    maintenance::uninstall_info(&state.maintenance_paths).map_err(command_error)
+}
+
+#[tauri::command]
+fn set_client_update_busy(state: State<'_, AppState>, busy: bool) {
+    state.client_update_busy.store(busy, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn uninstall_app(app: tauri::AppHandle, state: State<'_, AppState>) -> CommandResult<()> {
+    ensure_maintenance_idle(&state)?;
+    maintenance::begin_uninstall(&state.maintenance_paths).map_err(command_error)?;
+    app.exit(0);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let app_data = app.path().app_data_dir()?;
             let cache = app.path().app_cache_dir()?;
             let logs = app.path().app_log_dir()?;
+            let home = app.path().home_dir()?;
             fs::create_dir_all(&app_data)?;
             fs::create_dir_all(&cache)?;
             fs::create_dir_all(&logs)?;
@@ -254,6 +312,13 @@ pub fn run() {
                 settings,
                 app_data_dir: app_data,
                 records_dir,
+                maintenance_paths: maintenance::MaintenancePaths {
+                    app_data: app.path().app_data_dir()?,
+                    cache,
+                    logs,
+                    home,
+                },
+                client_update_busy: AtomicBool::new(false),
             });
             Ok(())
         })
@@ -278,6 +343,11 @@ pub fn run() {
             external_links,
             get_settings,
             update_settings,
+            get_storage_usage,
+            clear_app_cache,
+            get_uninstall_info,
+            set_client_update_busy,
+            uninstall_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running PowerPico Client");

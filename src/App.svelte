@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { check } from '@tauri-apps/plugin-updater';
   import { Activity, Cpu, Settings as SettingsIcon, Zap } from '@lucide/svelte';
   import { api, formatAppError, onEvent, type UnlistenFn } from './lib/api';
   import { setLocale } from './lib/i18n';
@@ -57,8 +58,11 @@
       media = matchMedia('(prefers-color-scheme: dark)');
       media.addEventListener('change', mediaChanged);
       if (settings.checkUpdateAtStartup) {
-        api.checkClientUpdate().then((update) => {
-          if (update.updateAvailable) notify(`${$_('settings.updateAvailable')}: ${update.latestVersion}`);
+        check({ timeout: 20_000 }).then(async (update) => {
+          if (update) {
+            notify(`${$_('settings.updateAvailable')}: ${update.version}`);
+            await update.close();
+          }
         }).catch(() => undefined);
       }
     } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }

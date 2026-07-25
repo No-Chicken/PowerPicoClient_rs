@@ -60,7 +60,8 @@
 
 1. 下载 `PowerPico-Client_<版本>_macos_aarch64.dmg`。
 2. 打开 DMG，将 `PowerPico Client.app` 拖入“应用程序”。
-3. 首次运行时，在 Finder 中按住 Control 点击应用并选择“打开”。
+3. 安装完成后在 Finder 侧边栏推出 `PowerPico Client` 磁盘映像卷。
+4. 首次运行时，在 Finder 中按住 Control 点击应用并选择“打开”。
 
 macOS 安装包目前未签名且未公证。如果系统仍然阻止运行，可在确认安装包来自本仓库后执行：
 
@@ -68,6 +69,10 @@ macOS 安装包目前未签名且未公证。如果系统仍然阻止运行，�
 xattr -dr com.apple.quarantine "/Applications/PowerPico Client.app"
 open "/Applications/PowerPico Client.app"
 ```
+
+设置页提供缓存空间统计、一键清理和完整卸载。完整卸载会将 App 移入废纸篓、删除应用数据，并推出仍挂载且经过应用标识校验的 PowerPico Client DMG 卷；下载目录中的原始 DMG 文件不会被删除。
+
+客户端支持应用内检查、下载、签名校验和安装更新。OTA 更新包不会挂载新的 DMG 卷。
 
 ### Ubuntu / Debian Linux
 
@@ -147,7 +152,7 @@ cargo test
 macOS ARM64 未签名 DMG：
 
 ```bash
-pnpm tauri build --bundles dmg
+pnpm tauri build --bundles app,dmg
 ```
 
 本地 Linux 构建使用固定的 Ubuntu 22.04 Docker 容器：
@@ -167,7 +172,11 @@ Release workflow 支持两种入口：
 - 推送严格格式的 `vX.Y.Z` tag 后自动执行。
 - 在 GitHub Actions 页面手动运行 Release workflow，并输入一个已有的 `vX.Y.Z` tag。
 
-发布前必须将中文说明保存到 `.github/release-notes/vX.Y.Z.md`。工作流会校验 tag 与 npm、Tauri、Cargo 版本一致，执行前后端质量检查，构建 macOS ARM64 DMG、Linux x86_64 DEB/AppImage，生成 `SHA256SUMS` 并发布正式 Release。重新运行已发布 tag 时会覆盖同名资产和说明。
+发布前必须将中文说明保存到 `.github/release-notes/vX.Y.Z.md`。工作流会校验 tag 与 npm、Tauri、Cargo 版本一致，执行前后端质量检查，构建 macOS ARM64 DMG 和签名 OTA 包、Linux x86_64 DEB/AppImage，生成 `latest.json` 与 `SHA256SUMS` 并发布正式 Release。重新运行已发布 tag 时会覆盖同名资产和说明。
+
+### OTA 签名密钥
+
+Tauri updater 私钥不得提交到仓库。将本地 `.tauri-signing-private.key` 的完整内容配置为 GitHub Actions Secret `TAURI_SIGNING_PRIVATE_KEY`；如私钥带密码，同时配置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。公钥已写入 `src-tauri/tauri.conf.json`，丢失或更换私钥后，旧版本客户端将无法验证使用新密钥签名的更新，因此密钥轮换必须先发布同时信任新公钥的过渡版本。
 
 ---
 
