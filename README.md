@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Tauri-v2-24C8DB" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Svelte-v5-FF3E00" alt="Svelte v5">
   <img src="https://img.shields.io/badge/Core-Rust-DEA584" alt="Rust">
-  <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Linux%20%7C%20Windows-informational" alt="macOS, Linux and Windows">
+  <img src="https://img.shields.io/badge/Targets-macOS%20%7C%20Linux%20%7C%20Windows-informational" alt="Target platforms: macOS, Linux and Windows">
   <br>
   <a href="https://github.com/No-Chicken/PowerPicoClient_rs/stargazers"><img src="https://img.shields.io/github/stars/No-Chicken/PowerPicoClient_rs.svg" alt="GitHub stars"></a>
 </div>
@@ -16,7 +16,7 @@
 
 ## 📖 项目简介
 
-**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，提供高速数据采集、实时波形、精确区间分析、记录导入导出和固件升级能力。当前已完成 macOS 和 Linux 适配，Windows 为项目支持的目标平台，当前版本尚未完成实现。
+**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，提供高速数据采集、实时波形、精确区间分析、记录导入导出、固件升级、缓存管理和客户端更新能力。
 
 <p align="center">
   <a href="https://github.com/No-Chicken/Power-Pico">Power-Pico 主项目</a> |
@@ -37,7 +37,7 @@
 - **统计分析**：提供全局、最近 10 分钟、最近 1 分钟、最近 1 秒统计，以及右键拖选精确区间分析。
 - **固件升级**：支持官方固件查询与缓存、自定义 BIN、Bootloader 重新枚举、YMODEM 刷写、进度显示和取消。
 - **跨平台体验**：支持简体中文、繁体中文、英语、日语、系统语言模式，以及主题、界面缩放和渲染质量设置。
-- **更新与维护**：支持 GitHub Releases 更新检查、内部临时记录自动清理和平台滚动日志。
+- **更新与维护**：支持客户端 OTA、缓存空间统计与清理、内部临时记录自动回收和平台滚动日志。
 
 ---
 
@@ -93,19 +93,18 @@ chmod +x PowerPico-Client_<版本>_amd64.AppImage
 
 ## 💻 平台支持
 
-<div align="center">
+状态说明：✅ 已实现并纳入发布测试　🚧 计划支持、尚未完成　⚠️ 已实现但存在平台限制　➖ 当前不计划支持或不适用
 
-| 平台 | 架构 | 发布包 | 状态 |
-| :--- | :--- | :--- | :--- |
-| macOS 11+ | Apple Silicon ARM64 | DMG | 支持，未签名且未公证 |
-| Ubuntu / Debian Linux | x86_64 | DEB、AppImage | 支持 |
-| Windows | x86_64 | 暂无 | 项目支持的目标平台，当前版本尚未实现 |
+| 平台 | 数据采集与波形 | 记录导入导出 | 设备固件升级 | 缓存管理 | 应用内卸载 | 客户端 OTA | 发布包 |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| macOS 11+ / Apple Silicon | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ DMG（未签名/未公证）、✅ OTA 包 |
+| Ubuntu / Debian / x86_64 | ✅ | ✅ | ✅ | ✅ | ➖ | 🚧 | ✅ DEB、AppImage |
+| Windows / x86_64 | 🚧 | 🚧 | 🚧 | 🚧 | 🚧 | 🚧 | 🚧 MSI/NSIS |
+| macOS / Intel | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
+| Linux / ARM64 | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ | ➖ |
 
-</div>
+macOS DMG 当前未进行 Apple Developer ID 签名和公证，因此首次启动可能需要通过 Finder 手动确认。DEB 包基于 Ubuntu 22.04 构建，理论上可用于 Debian 11+、Ubuntu 22.04+、Linux Mint 21+；AppImage 可在多数 x86_64 Linux 发行版运行。RPM 当前不在发布计划内。
 
-Windows 已纳入项目支持范围，但当前版本尚未完成平台适配、构建与安装包发布。macOS Intel、Linux ARM64 和 RPM 当前不支持，也不属于当前发布目标。
-
-DEB 包基于 Ubuntu 22.04 构建，理论上可在 Debian 11+、Ubuntu 22.04+、Linux Mint 21+ 等系统上安装。AppImage 可在大多数 x86_64 Linux 上运行，但不保证兼容性。
 ### Linux 串口权限
 
 客户端不应以 root 运行。Ubuntu/Debian 用户加入 `dialout`，Arch Linux 用户加入 `uucp`，然后注销并重新登录：
