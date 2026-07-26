@@ -13,6 +13,7 @@
   import { metricById, metricCatalog } from '../metrics';
   import { addMetric as addMetricToLayout, moveMetric as moveMetricInLayout, removeMetric as removeMetricFromLayout, reorderMetric } from '../metricLayout';
   import { formatBytes } from '../storageFormat';
+  import { isUpdaterManifestUnavailableError } from '../updater';
   import type { AppSettings, ExternalLinks, Language, MetricId, StorageUsage, ThemeMode, UninstallInfo } from '../types';
 
   export let settings: AppSettings;
@@ -62,11 +63,15 @@
     checkingUpdate = true;
     try {
       await updateInfo?.close();
+      updateInfo = null;
       updateInfo = await check({ timeout: 20_000 });
       updateStatus = 'idle'; updatePercent = 0;
       if (updateInfo) notify(`${$_('settings.updateAvailable')}: ${updateInfo.version}`, 'info');
       else notify($_('settings.upToDate'), 'success');
-    } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
+    } catch (error) {
+      if (isUpdaterManifestUnavailableError(error)) notify($_('settings.updateUnavailable'));
+      else notify(formatAppError(error, $_('errors.serialPermission')), 'error');
+    }
     finally { checkingUpdate = false; }
   }
 
