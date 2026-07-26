@@ -1,8 +1,10 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
+
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 use crate::{
     error::{CoreError, CoreResult},
@@ -10,6 +12,7 @@ use crate::{
 };
 
 pub const BUNDLE_ID: &str = "com.openfeasttech.powerpico-client";
+#[cfg(target_os = "macos")]
 const APP_NAME: &str = "PowerPico Client.app";
 
 #[derive(Clone)]
@@ -35,6 +38,7 @@ impl MaintenancePaths {
         ]
     }
 
+    #[cfg(any(target_os = "macos", test))]
     pub fn all_data(&self) -> Vec<PathBuf> {
         let mut paths = vec![self.app_data.clone(), self.cache.clone(), self.logs.clone()];
         paths.extend(self.system_data());
