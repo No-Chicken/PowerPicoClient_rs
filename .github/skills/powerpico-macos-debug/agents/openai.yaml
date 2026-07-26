@@ -1,0 +1,4 @@
+interface:
+  display_name: "PowerPico macOS 调试"
+  short_description: "在 macOS 上稳定调试 PowerPico 客户端与真机刷写"
+  default_prompt: "Use $powerpico-macos-debug to reproduce, diagnose, and verify this PowerPico Client issue on macOS."
