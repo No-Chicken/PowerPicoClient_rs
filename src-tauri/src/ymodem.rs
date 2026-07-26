@@ -91,11 +91,9 @@ fn wait_for_repeated(
     expected: u8,
     required: usize,
     timeout: Duration,
-    max_garbage: usize,
     cancel: &AtomicBool,
 ) -> CoreResult<()> {
     let started = Instant::now();
-    let mut garbage = 0;
     let mut consecutive = 0;
     let mut byte = [0u8; 1];
     while started.elapsed() < timeout {
@@ -108,14 +106,7 @@ fn wait_for_repeated(
                 return Ok(())
             }
             Ok(1) if byte[0] == expected => {}
-            Ok(1) => {
-                garbage += 1;
-                if garbage > max_garbage {
-                    return Err(CoreError::Other(format!(
-                        "received too much unexpected data while waiting for {required} consecutive 0x{expected:02x} bytes"
-                    )));
-                }
-            }
+            Ok(1) => {}
             Ok(_) => {}
             Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {}
             Err(error) => return Err(CoreError::Serial(error.to_string())),
@@ -137,12 +128,14 @@ pub fn send_file(
         .file_name()
         .and_then(|value| value.to_str())
         .ok_or_else(|| CoreError::Other("invalid firmware filename".into()))?;
-    port.clear(serialport::ClearBuffer::Input)?;
     // The STM32 IAP bootloader logs "Erase Complete" immediately before
     // starting YMODEM. A single-byte search mistakes the C in "Complete" for
     // the protocol's CRC request and sends the header too early. The receiver
     // repeats CRC_C while idle, so require two consecutive requests here.
-    wait_for_repeated(port, CRC_C, 2, Duration::from_secs(60), 500, &cancel)?;
+    // Erasing a large application can produce well over 500 bytes of progress
+    // output before YMODEM starts. Do not treat bootloader text as a protocol
+    // failure here; the repeated CRC request plus timeout are the handshake.
+    wait_for_repeated(port, CRC_C, 2, Duration::from_secs(60), &cancel)?;
     let mut header = vec![0u8; 128];
     let metadata = format!("{file_name}\0{file_size}");
     if metadata.len() > header.len() {
