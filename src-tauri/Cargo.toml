@@ -1,6 +1,6 @@
 [package]
 name = "powerpico-client"
-version = "0.1.2"
+version = "0.1.3"
 description = "Open-source cross-platform client for PowerPico"
 authors = ["OpenFeastTech"]
 license = "GPL-3.0-only"

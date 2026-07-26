@@ -257,7 +257,7 @@
     <div class="setting"><div class="label"><ExternalLink size={20}/><div><strong>{$_('settings.provideFeedback')}</strong></div></div><button class="secondary-button" onclick={() => openExternalLink(links?.feedback)}>{$_('common.open')}</button></div>
   </div>
 
-  <div class="group panel about"><h2><Scale size={19}/>{$_('settings.about')}</h2><p>{$_('settings.aboutText')}</p><code>PowerPico Client 0.1.2 · GPL-3.0-only</code></div>
+  <div class="group panel about"><h2><Scale size={19}/>{$_('settings.about')}</h2><p>{$_('settings.aboutText')}</p><code>PowerPico Client 0.1.3 · GPL-3.0-only</code></div>
 </section>
 
 <style>
