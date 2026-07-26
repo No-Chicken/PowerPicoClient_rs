@@ -2,7 +2,7 @@
   <h1 align="center">PowerPico Client</h1>
   <p align="center">面向 PowerPico 的跨平台数据采集、波形分析与固件升级客户端</p>
 
-  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.1.2-blue" alt="Version 0.1.2"></a>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.1.3-blue" alt="Version 0.1.3"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
   <img src="https://img.shields.io/badge/Tauri-v2-24C8DB" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Svelte-v5-FF3E00" alt="Svelte v5">
@@ -177,7 +177,7 @@ Release workflow 支持两种入口：
 
 ### OTA 签名密钥
 
-Tauri updater 私钥不得提交到仓库。将本地 `.tauri-signing-private.key` 的完整内容配置为 GitHub Actions Secret `TAURI_SIGNING_PRIVATE_KEY`；如私钥带密码，同时配置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。公钥已写入 `src-tauri/tauri.conf.json`，丢失或更换私钥后，旧版本客户端将无法验证使用新密钥签名的更新，因此密钥轮换必须先发布同时信任新公钥的过渡版本。
+Tauri updater 私钥不得提交到仓库。将本地 `.tauri-signing-private.key` 的完整内容配置为 GitHub Actions Secret `TAURI_SIGNING_PRIVATE_KEY`；如私钥带密码，同时配置 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`。公钥已写入 `src-tauri/tauri.conf.json`，丢失或更换私钥后，旧版本客户端将无法验证使用新密钥签名的更新，因此密钥轮换必须先发布同时信任新公钥的过渡版本。完整操作、验证和故障排查见 [macOS OTA 签名密钥配置](./docs/ota-signing.md)。
 
 ---
 

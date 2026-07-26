@@ -19,6 +19,46 @@ use crate::{
     ymodem,
 };
 
+const CRC_C: u8 = b'C';
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BootloaderState {
+    Prompt,
+    Menu,
+    Ymodem,
+}
+
+fn observe_bootloader(
+    transcript: &[u8],
+    chunk: &[u8],
+    consecutive_crc: &mut usize,
+) -> Option<BootloaderState> {
+    if transcript
+        .windows(b"Main Menu".len())
+        .any(|part| part == b"Main Menu")
+    {
+        return Some(BootloaderState::Menu);
+    }
+    if transcript
+        .windows(b"##PICO_BOOT##".len())
+        .any(|part| part == b"##PICO_BOOT##")
+    {
+        return Some(BootloaderState::Prompt);
+    }
+
+    for byte in chunk {
+        if *byte == CRC_C {
+            *consecutive_crc += 1;
+            if *consecutive_crc >= 2 {
+                return Some(BootloaderState::Ymodem);
+            }
+        } else {
+            *consecutive_crc = 0;
+        }
+    }
+    None
+}
+
 pub struct FirmwareManager {
     cancel: Arc<AtomicBool>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -113,7 +153,9 @@ impl FirmwareManager {
                 let started = Instant::now();
                 let mut text = Vec::new();
                 let mut buffer = [0u8; 512];
-                let mut ready = false;
+                let mut consecutive_crc = 0;
+                let mut state = None;
+                let mut menu_probe_sent = false;
                 while started.elapsed() < Duration::from_secs(6) {
                     if cancel.load(Ordering::Relaxed) {
                         return Err(CoreError::Cancelled);
@@ -121,26 +163,41 @@ impl FirmwareManager {
                     match port.read(&mut buffer) {
                         Ok(count) if count > 0 => {
                             text.extend_from_slice(&buffer[..count]);
-                            if text.windows(13).any(|part| part == b"##PICO_BOOT##")
-                                || text.windows(9).any(|part| part == b"Main Menu")
+                            if let Some(observed) =
+                                observe_bootloader(&text, &buffer[..count], &mut consecutive_crc)
                             {
-                                ready = true;
+                                state = Some(observed);
                                 break;
                             }
                         }
                         Ok(_) => {}
                         Err(error) if error.kind() == std::io::ErrorKind::TimedOut => {
-                            port.write_all(b"0")?;
+                            // An active YMODEM receiver sends one CRC request roughly once per
+                            // second. Probing its menu between those requests injects a byte into
+                            // the transfer and can make it discard the following header packet.
+                            // Only probe silent legacy bootloaders after allowing enough time for
+                            // two CRC requests to arrive.
+                            if !menu_probe_sent
+                                && consecutive_crc == 0
+                                && started.elapsed() >= Duration::from_millis(2500)
+                            {
+                                port.write_all(b"0")?;
+                                menu_probe_sent = true;
+                            }
                         }
                         Err(error) => return Err(CoreError::Serial(error.to_string())),
                     }
                 }
-                if !ready {
+                let state = state.ok_or_else(|| {
+                    CoreError::Timeout("waiting for bootloader menu or YMODEM receiver".into())
+                })?;
+                if state == BootloaderState::Prompt {
                     port.write_all(b"0")?;
+                    thread::sleep(Duration::from_millis(200));
+                    port.write_all(b"1")?;
+                } else if state == BootloaderState::Menu {
+                    port.write_all(b"1")?;
                 }
-                thread::sleep(Duration::from_millis(200));
-                port.clear(serialport::ClearBuffer::Input)?;
-                port.write_all(b"1")?;
                 emit(FirmwareStage::Uploading, 6, "uploading", None);
                 let app_for_progress = app.clone();
                 ymodem::send_file(
@@ -204,5 +261,47 @@ impl Drop for FirmwareManager {
         if let Some(handle) = self.thread.get_mut().take() {
             let _ = handle.join();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_an_already_active_ymodem_receiver() {
+        let mut consecutive_crc = 0;
+        assert_eq!(observe_bootloader(b"C", b"C", &mut consecutive_crc), None);
+        assert_eq!(
+            observe_bootloader(b"CC", b"C", &mut consecutive_crc),
+            Some(BootloaderState::Ymodem)
+        );
+    }
+
+    #[test]
+    fn log_text_does_not_look_like_an_active_ymodem_receiver() {
+        let log = b"Erase Complete.\r\nStarting Ymodem Receive\r\n";
+        let mut consecutive_crc = 0;
+        assert_eq!(observe_bootloader(log, log, &mut consecutive_crc), None);
+    }
+
+    #[test]
+    fn detects_bootloader_markers_across_the_accumulated_transcript() {
+        let transcript = b"booting... ##PICO_BOOT##";
+        let mut consecutive_crc = 0;
+        assert_eq!(
+            observe_bootloader(transcript, b"BOOT##", &mut consecutive_crc),
+            Some(BootloaderState::Prompt)
+        );
+    }
+
+    #[test]
+    fn main_menu_takes_priority_over_an_earlier_prompt_marker() {
+        let transcript = b"##PICO_BOOT##\r\nMain Menu";
+        let mut consecutive_crc = 0;
+        assert_eq!(
+            observe_bootloader(transcript, b"Main Menu", &mut consecutive_crc),
+            Some(BootloaderState::Menu)
+        );
     }
 }
