@@ -272,7 +272,7 @@ jobs:
           if-no-files-found: error
 
   build-windows:
-    name: Build Windows x86_64
+    name: Build Windows x86_64 NSIS and portable
     needs: [validate-version, quality]
     runs-on: windows-2022
     env:
@@ -297,7 +297,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - name: Validate, build and sign Windows packages
+      - name: Validate, build NSIS and portable, sign NSIS updater
         shell: powershell
         run: ./scripts/build-windows.ps1 -Updater
       - uses: actions/upload-artifact@v4
@@ -306,6 +306,7 @@ jobs:
           path: |
             artifacts/windows/*.exe
             artifacts/windows/*.exe.sig
+            artifacts/windows/*-portable.zip
           if-no-files-found: error
 
   prepare-release:
@@ -345,12 +346,16 @@ jobs:
           signature="${updater}.sig"
           windows_installer="assets/PowerPico-Client_${VERSION}_windows_x86_64-setup.exe"
           windows_signature="${windows_installer}.sig"
+          windows_portable="assets/PowerPico-Client_${VERSION}_windows_x86_64-portable.zip"
           notes="release-notes/${TAG}.md"
           test -f "${dmg}"
           test -f "${updater}"
           test -s "${signature}"
           test -s "${windows_installer}"
           test -s "${windows_signature}"
+          test -s "${windows_portable}"
+          unzip -t "${windows_portable}"
+          unzip -Z1 "${windows_portable}" | grep -Fxq powerpico-client.exe
           test -f "assets/PowerPico-Client_${VERSION}_amd64.deb"
           test -f "assets/PowerPico-Client_${VERSION}_amd64.AppImage"
           test -s "${notes}"

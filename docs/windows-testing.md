@@ -75,3 +75,15 @@ GitHub Actions 已新增 Windows 2022 x64 构建，使用 `-Updater` 生成签�
 Release 工作流通过 actionlint，资产聚合脚本已在本地使用 macOS/Linux 占位文件和实际 Windows 测试签名执行，确认 Windows URL、签名与 SHA256SUMS 均正确纳入。正式 GitHub Actions 发布尚未实际触发；Windows 更新安装也未连接正式服务做端到端验证。应用内完整卸载仍只支持 macOS，Windows 使用 NSIS 提供的系统卸载入口。安装器尚未做 Authenticode 代码签名。
 
 `-Updater` 本地已用仓库外临时密钥和临时公钥覆盖进行完整签名构建，随后用独立 Ed25519 实现校验安装器签名及 trusted comment，均通过。测试结束删除临时私钥、恢复仓库公钥并重新生成普通交付安装包；交付安装包不带临时测试签名。
+
+## Windows 便携版与 CI
+
+`pnpm tauri:build:windows` 同时生成 `artifacts/windows/PowerPico-Client_0.1.3_windows_x86_64-setup.exe`、`PowerPico-Client_0.1.3_windows_x86_64-portable.zip` 和校验文件。ZIP 根目录包含 `powerpico-client.exe`、`README.txt`、`LICENSE.txt`、`THIRD_PARTY_NOTICES.md`；EXE 来自同一次 release 构建，临时打包目录会自动清理。
+
+便携版不创建系统安装记录，依赖电脑已有的 WebView2 Runtime。应用数据仍在 AppData，与安装版共享。解压替换用于便携版更新；应用内 updater 仍使用 NSIS 并转为安装版。
+
+新增独立 Windows CI：PR、main 推送和手动运行无需私钥即可检查并构建两种产物；校验 SHA256、解压内容和 EXE 与构建产物的一致性，再上传 CI artifact。Release Windows job 同时上传 NSIS、便携 ZIP 和安装器更新签名；聚合阶段检查 ZIP 文件完整性与可执行文件，生成包含两种分发格式的 SHA256SUMS，updater manifest 继续指向 NSIS。
+
+实际验证（2026-11-17）：完整 Windows 离线构建通过，Svelte 0 错误/0 警告、前端 15 项、Rust 后端 25 项，fmt/Clippy 通过。已执行 CI 中同一段校验脚本，确认 NSIS 和 ZIP 的 SHA256 正确、ZIP 包含全部四个必要文件、解压后的 EXE 与 release EXE 完全一致。便携版从中文和空格目录启动，通过 UI 连接 COM3，5.1 秒采集 50,780 样本并正常停止。
+
+Windows CI 和 Release workflow 通过 actionlint。Release 聚合脚本以真实便携 ZIP、此前签名测试使用的 Windows NSIS 和 macOS/Linux 占位资产在本地执行成功：两种 Windows 包均进入全局校验列表，updater URL 仍指向 NSIS；删除 ZIP 的负向测试确认发布被阻止。尚未向 GitHub 推送或实际触发 Actions。

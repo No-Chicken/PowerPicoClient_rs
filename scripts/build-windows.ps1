@@ -53,6 +53,7 @@ $project = Split-Path $PSScriptRoot -Parent
 $target = 'x86_64-pc-windows-msvc'
 $previousTargetDir = $env:CARGO_TARGET_DIR
 $updaterConfig = $null
+$portableStaging = $null
 Push-Location $project
 try {
     $env:CARGO_TARGET_DIR = Join-Path $project 'src-tauri\target'
@@ -87,14 +88,26 @@ try {
     if ($Offline) { $buildArgs += '--offline' }
     Invoke-Checked 'pnpm.cmd' $buildArgs
 
-    $bundle = Join-Path $env:CARGO_TARGET_DIR "$target\release\bundle\nsis"
+    $release = Join-Path $env:CARGO_TARGET_DIR "$target\release"
+    $bundle = Join-Path $release 'bundle\nsis'
     $installer = Join-Path $bundle "PowerPico Client_$($package.version)_x64-setup.exe"
     if (-not (Test-Path $installer)) { throw "Missing installer: $installer" }
     $output = Join-Path $project 'artifacts\windows'
     New-Item -ItemType Directory $output -Force | Out-Null
     $name = "PowerPico-Client_$($package.version)_windows_x86_64-setup.exe"
     Copy-Item $installer (Join-Path $output $name) -Force
-    $assets = @($name)
+    $portableName = "PowerPico-Client_$($package.version)_windows_x86_64-portable.zip"
+    $portableStaging = Join-Path ([IO.Path]::GetTempPath()) ('powerpico-portable-' + [guid]::NewGuid())
+    $payload = Join-Path $portableStaging 'payload'
+    New-Item -ItemType Directory $payload -Force | Out-Null
+    Copy-Item (Join-Path $release 'powerpico-client.exe') $payload
+    Copy-Item (Join-Path $project 'packaging\windows\README-portable.txt') (Join-Path $payload 'README.txt')
+    Copy-Item (Join-Path $project 'LICENSE') (Join-Path $payload 'LICENSE.txt')
+    Copy-Item (Join-Path $project 'THIRD_PARTY_NOTICES.md') $payload
+    $archive = Join-Path $portableStaging $portableName
+    Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $archive -CompressionLevel Optimal
+    Move-Item $archive (Join-Path $output $portableName) -Force
+    $assets = @($name, $portableName)
     $signature = Join-Path $output "$name.sig"
     if ($Updater) {
         if (-not (Test-Path "$installer.sig") -or (Get-Item "$installer.sig").Length -eq 0) {
@@ -114,6 +127,7 @@ try {
     [IO.File]::WriteAllLines((Join-Path $output 'SHA256SUMS'), [string[]]$checksums, [Text.UTF8Encoding]::new($false))
     Write-Host "Windows packages written to $output"
 } finally {
+    if ($portableStaging -and (Test-Path $portableStaging)) { Remove-Item $portableStaging -Recurse -Force }
     if ($updaterConfig -and (Test-Path $updaterConfig)) { Remove-Item $updaterConfig }
     $env:CARGO_TARGET_DIR = $previousTargetDir
     Pop-Location
