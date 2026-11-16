@@ -193,11 +193,11 @@ impl DownloadManager {
                     }
                     file.write_all(&buffer[..count])?;
                     received += count as u64;
-                    let percent = if total == 0 {
-                        0
-                    } else {
-                        ((received.saturating_mul(100) / total).min(99)) as u8
-                    };
+                    let percent = received
+                        .saturating_mul(100)
+                        .checked_div(total)
+                        .unwrap_or(0)
+                        .min(99) as u8;
                     emit(percent, "downloading", None);
                 }
                 file.flush()?;

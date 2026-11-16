@@ -271,9 +271,47 @@ jobs:
           path: release/*
           if-no-files-found: error
 
+  build-windows:
+    name: Build Windows x86_64 NSIS and portable
+    needs: [validate-version, quality]
+    runs-on: windows-2022
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate-version.outputs.tag }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare "pnpm@${{ env.PNPM_VERSION }}" --activate
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: x86_64-pc-windows-msvc
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Validate, build NSIS and portable, sign NSIS updater
+        shell: powershell
+        run: ./scripts/build-windows.ps1 -Updater
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: |
+            artifacts/windows/*.exe
+            artifacts/windows/*.exe.sig
+            artifacts/windows/*-portable.zip
+          if-no-files-found: error
+
   prepare-release:
     name: Prepare release assets
-    needs: [validate-version, build-linux, build-macos]
+    needs: [validate-version, build-linux, build-macos, build-windows]
     runs-on: ubuntu-22.04
     steps:
       - name: Download Linux packages
@@ -285,6 +323,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: macos-package
+          path: assets
+      - name: Download Windows package
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-package
           path: assets
       - name: Download release notes
         uses: actions/download-artifact@v4
@@ -301,10 +344,18 @@ jobs:
           dmg="assets/PowerPico-Client_${VERSION}_macos_aarch64.dmg"
           updater="assets/PowerPico-Client_${VERSION}_macos_aarch64.app.tar.gz"
           signature="${updater}.sig"
+          windows_installer="assets/PowerPico-Client_${VERSION}_windows_x86_64-setup.exe"
+          windows_signature="${windows_installer}.sig"
+          windows_portable="assets/PowerPico-Client_${VERSION}_windows_x86_64-portable.zip"
           notes="release-notes/${TAG}.md"
           test -f "${dmg}"
           test -f "${updater}"
           test -s "${signature}"
+          test -s "${windows_installer}"
+          test -s "${windows_signature}"
+          test -s "${windows_portable}"
+          unzip -t "${windows_portable}"
+          unzip -Z1 "${windows_portable}" | grep -Fxq powerpico-client.exe
           test -f "assets/PowerPico-Client_${VERSION}_amd64.deb"
           test -f "assets/PowerPico-Client_${VERSION}_amd64.AppImage"
           test -s "${notes}"
@@ -314,10 +365,12 @@ jobs:
             --arg pub_date "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
             --arg signature "$(<"${signature}")" \
             --arg url "https://github.com/${REPOSITORY}/releases/download/${TAG}/$(basename "${updater}")" \
-            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {"darwin-aarch64": {signature: $signature, url: $url}}}' \
+            --arg windows_signature "$(<"${windows_signature}")" \
+            --arg windows_url "https://github.com/${REPOSITORY}/releases/download/${TAG}/$(basename "${windows_installer}")" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {"darwin-aarch64": {signature: $signature, url: $url}, "windows-x86_64": {signature: $windows_signature, url: $windows_url}}}' \
             > assets/latest.json
           (cd assets && sha256sum PowerPico-Client_* latest.json > SHA256SUMS)
-          jq -e --arg version "${VERSION}" '.version == $version and .platforms["darwin-aarch64"].signature != ""' assets/latest.json >/dev/null
+          jq -e --arg version "${VERSION}" '.version == $version and .platforms["darwin-aarch64"].signature != "" and .platforms["windows-x86_64"].signature != ""' assets/latest.json >/dev/null
       - uses: actions/upload-artifact@v4
         with:
           name: release-assets

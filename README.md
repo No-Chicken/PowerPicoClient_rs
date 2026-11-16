@@ -74,6 +74,17 @@ open "/Applications/PowerPico Client.app"
 
 客户端支持应用内检查、下载、签名校验和安装更新。OTA 更新包不会挂载新的 DMG 卷。
 
+### Windows x86_64
+
+提供两种 x86_64 分发格式：
+
+| 格式 | 文件 | 使用方式 |
+| --- | --- | --- |
+| NSIS 安装版 | `PowerPico-Client_<版本>_windows_x86_64-setup.exe` | 按当前用户安装，提供开始菜单及系统卸载入口；缺少 WebView2 时引导安装 |
+| 便携 ZIP | `PowerPico-Client_<版本>_windows_x86_64-portable.zip` | 解压全部文件后运行 `powerpico-client.exe`，电脑需已有 WebView2 Runtime |
+
+便携版附带使用说明、GPL 许可证和第三方声明。它是免安装分发，设置、固件、采集记录和日志仍使用当前用户的 AppData，与安装版共享；移动程序文件夹不会迁移这些数据。更新便携版时关闭客户端，再解压替换程序文件。应用内更新走 NSIS 安装器，会转为安装版。官方设备使用 Windows USB CDC 串口驱动。
+
 ### Ubuntu / Debian Linux
 
 DEB 安装包：
@@ -97,13 +108,13 @@ chmod +x PowerPico-Client_<版本>_amd64.AppImage
 
 | 功能 | macOS 11+ / Apple Silicon | Ubuntu / Debian / x86_64 | Windows / x86_64 |
 | :--- | :---: | :---: | :---: |
-| 数据采集与波形 | ✅ | ✅ | 🚧 |
-| 记录导入导出 | ✅ | ✅ | 🚧 |
-| 设备固件升级 | ✅ | ✅ | 🚧 |
+| 数据采集与波形 | ✅ | ✅ | ✅ |
+| 记录导入导出 | ✅ | ✅ | ✅ |
+| 设备固件升级 | ✅ | ✅ | ✅ |
 | 缓存管理 | ✅ | ✅ | 🚧 |
-| 应用内卸载 | ✅ | ➖ | 🚧 |
+| 应用内卸载 | ✅ | ➖ | ➖（使用系统卸载入口） |
 | 客户端 OTA | ✅ | 🚧 | 🚧 |
-| 发布包 | ⚠️ DMG（未签名/未公证）、✅ OTA 包 | ✅ DEB、AppImage | 🚧 MSI/NSIS |
+| 发布包 | ⚠️ DMG（未签名/未公证）、✅ OTA 包 | ✅ DEB、AppImage | ✅ NSIS、便携 ZIP（未做 Authenticode 签名） |
 
 macOS DMG 当前未进行 Apple Developer ID 签名和公证，因此首次启动可能需要通过 Finder 手动确认。DEB 包基于 Ubuntu 22.04 构建，理论上可用于 Debian 11+、Ubuntu 22.04+、Linux Mint 21+；AppImage 可在多数 x86_64 Linux 发行版运行。RPM 当前不在发布计划内。
 
@@ -134,6 +145,38 @@ Arch Linux 开发依赖：
 ```bash
 sudo pacman -S --needed base-devel webkit2gtk-4.1 libappindicator-gtk3 librsvg systemd
 ```
+
+### Windows 本地开发与构建
+
+安装 Node.js 20+、Rust 的 `x86_64-pc-windows-msvc` 工具链、Visual Studio Build Tools（C++ 桌面工具与 Windows SDK）和 WebView2 Runtime。
+
+若 PowerShell 提示禁止运行 `pnpm.ps1` 或 `tauri.ps1`，为当前用户配置脚本策略，或使用 `pnpm.cmd`：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pnpm install --frozen-lockfile
+pnpm tauri dev
+# 正式构建并生成 NSIS 安装包
+pnpm tauri build
+```
+
+开发启动使用 `tauri dev`；`tauri build dev` 不是开发启动命令。项目本地 CLI 通过 `pnpm tauri` 调用，无需另行全局安装。
+
+Windows 平台配置自动选择当前用户 NSIS 安装。直接 `pnpm tauri build` 可在没有 updater 私钥的情况下构建本地安装包；产物位于 `src-tauri/target/release/`。
+
+同时生成 NSIS 与便携 ZIP 的完整 Windows 验证和打包命令：
+
+```powershell
+pnpm tauri:build:windows
+# 已缓存全部依赖时离线运行
+pnpm tauri:build:windows -Offline
+# 正式发布：从环境读取 TAURI_SIGNING_PRIVATE_KEY 和可选密码
+pnpm tauri:build:windows -Updater
+```
+
+脚本自动发现 MSVC Build Tools、安装锁定依赖、运行 Svelte / 前端测试 / Rust 格式 / Clippy / 后端测试，构建 x64 NSIS 和便携 ZIP，输出统一文件名和包含两种产物的 `SHA256SUMS` 到 `artifacts/windows/`。`-SkipChecks` 仅用于已经完成检查后的重复打包。显式 x64 目标的原始产物在 `src-tauri/target/x86_64-pc-windows-msvc/release/`。
+
+`-Updater` 使用现有发布密钥生成 `.exe.sig`，GitHub Actions 将安装器、便携 ZIP 和安装器签名纳入 Release；`latest.json` 的 `windows-x86_64` 指向 NSIS 安装器。便携 ZIP 使用 `SHA256SUMS` 校验，不作为 Tauri updater 载荷。Tauri 更新签名与 Windows Authenticode 代码签名是两个机制；本项目尚未配置 Authenticode。完整实机验收范围见 [Windows 测试记录](./docs/windows-testing.md)。
 
 ### 质量检查
 
@@ -173,7 +216,13 @@ Release workflow 支持两种入口：
 - 推送严格格式的 `vX.Y.Z` tag 后自动执行。
 - 在 GitHub Actions 页面手动运行 Release workflow，并输入一个已有的 `vX.Y.Z` tag。
 
-发布前必须将中文说明保存到 `.github/release-notes/vX.Y.Z.md`。工作流会校验 tag 与 npm、Tauri、Cargo 版本一致，执行前后端质量检查，构建 macOS ARM64 DMG 和签名 OTA 包、Linux x86_64 DEB/AppImage，生成 `latest.json` 与 `SHA256SUMS` 并发布正式 Release。重新运行已发布 tag 时会覆盖同名资产和说明。
+发布前必须将中文说明保存到 `.github/release-notes/vX.Y.Z.md`。工作流会校验 tag 与 npm、Tauri、Cargo 版本一致，执行前后端质量检查，构建 macOS ARM64 DMG 和签名 OTA 包、Linux x86_64 DEB/AppImage、Windows x86_64 NSIS、便携 ZIP 及安装器更新签名，生成 `latest.json` 与 `SHA256SUMS` 并发布正式 Release。重新运行已发布 tag 时会覆盖同名资产和说明。
+
+### Windows CI
+
+`.github/workflows/windows.yml` 在向 `main` 推送、提交 PR 或手动运行时，执行 Windows 原生检查与打包，不需要发布私钥。它会验证两种产物的 SHA256、便携 ZIP 的必要文件及 EXE 一致性，并上传 `windows-x86_64-nsis-and-portable` 构建产物，保留 14 天。
+
+正式 Release 的 Windows job 使用同一脚本加 `-Updater`，发布 NSIS、便携 ZIP、`.exe.sig`，聚合阶段校验 ZIP 完整性并将两种产物纳入 Release `SHA256SUMS`。CI 构建产物可用于 PR 验证；对外分发版本从 GitHub Releases 获取。
 
 ### OTA 签名密钥
 
