@@ -2,7 +2,7 @@
   <h1 align="center">PowerPico Client</h1>
   <p align="center">面向 PowerPico 的跨平台数据采集、波形分析与固件升级客户端</p>
 
-  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.2.0-blue" alt="Version 0.2.0"></a>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.2.1-blue" alt="Version 0.2.1"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
   <img src="https://img.shields.io/badge/Tauri-v2-24C8DB" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Svelte-v5-FF3E00" alt="Svelte v5">

@@ -39,7 +39,8 @@ if ($LASTEXITCODE -ne 0 -or -not $installation) {
     throw 'No Visual Studio installation with the x64 C++ tools was found.'
 }
 $vcvars = Join-Path $installation 'VC\Auxiliary\Build\vcvars64.bat'
-$devEnvironment = & $env:ComSpec /d /s /c ('""{0}" >nul && set"' -f $vcvars)
+# CALL keeps a path with spaces quoted without an extra outer /C quote layer.
+$devEnvironment = & $env:ComSpec /d /s /c ('call "{0}" >nul && set' -f $vcvars)
 if ($LASTEXITCODE -ne 0) {
     throw 'Unable to initialize the MSVC build environment.'
 }
