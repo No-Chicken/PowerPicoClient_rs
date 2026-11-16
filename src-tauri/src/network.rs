@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn semantic_versions_ignore_v_prefix() {
-        let current = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+        let current = Version::parse("0.1.3").unwrap();
         let latest = Version::parse("v0.2.0".trim_start_matches('v')).unwrap();
         assert!(latest > current);
     }
