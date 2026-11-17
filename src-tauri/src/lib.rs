@@ -1,3 +1,4 @@
+mod calibration;
 mod capture;
 mod device;
 mod error;
@@ -16,7 +17,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 
 use capture::CaptureManager;
 use error::{AppError, CommandResult, CoreError};
@@ -30,6 +31,8 @@ use types::{
 
 pub struct AppState {
     capture: CaptureManager,
+    calibration: calibration::CalibrationManager,
+    serial_gate: parking_lot::Mutex<()>,
     firmware: FirmwareManager,
     downloads: DownloadManager,
     settings: SettingsStore,
@@ -41,6 +44,7 @@ pub struct AppState {
 
 fn ensure_maintenance_idle(state: &AppState) -> Result<(), AppError> {
     if state.capture.is_running()
+        || state.calibration.connected()
         || state.firmware.is_running()
         || state.downloads.is_running()
         || state.client_update_busy.load(Ordering::SeqCst)
@@ -65,7 +69,8 @@ fn start_capture(
     state: State<'_, AppState>,
     device_id: String,
 ) -> CommandResult<CaptureState> {
-    if state.firmware.is_running() {
+    let _gate = state.serial_gate.lock();
+    if state.firmware.is_running() || state.calibration.connected() {
         return Err(CoreError::DeviceBusy.into());
     }
     state
@@ -150,13 +155,69 @@ fn flash_firmware(
     device_id: String,
     file_path: String,
 ) -> CommandResult<()> {
-    if state.capture.is_running() {
+    let _gate = state.serial_gate.lock();
+    if state.capture.is_running() || state.calibration.connected() {
         return Err(CoreError::DeviceBusy.into());
     }
     state
         .firmware
         .start(app, device_id, PathBuf::from(file_path))
         .map_err(command_error)
+}
+
+#[tauri::command]
+fn get_calibration_state(state: State<'_, AppState>) -> calibration::CalibrationState {
+    state.calibration.state()
+}
+
+#[tauri::command]
+fn connect_calibration(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    device_id: String,
+) -> CommandResult<calibration::CalibrationState> {
+    let _gate = state.serial_gate.lock();
+    if state.capture.is_running() || state.firmware.is_running() {
+        return Err(CoreError::DeviceBusy.into());
+    }
+    let next = state
+        .calibration
+        .connect(device_id)
+        .map_err(command_error)?;
+    app.emit("calibration-state", &next).ok();
+    Ok(next)
+}
+
+#[tauri::command]
+fn disconnect_calibration(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> CommandResult<calibration::CalibrationState> {
+    let _gate = state.serial_gate.lock();
+    let next = state.calibration.disconnect().map_err(command_error)?;
+    app.emit("calibration-state", &next).ok();
+    Ok(next)
+}
+
+#[tauri::command]
+fn run_calibration(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    operation: String,
+    range: Option<u8>,
+    gain: Option<f64>,
+    offset_ua: Option<f64>,
+) -> CommandResult<()> {
+    let _gate = state.serial_gate.lock();
+    state
+        .calibration
+        .start(app, operation, range, gain, offset_ua)
+        .map_err(command_error)
+}
+
+#[tauri::command]
+fn cancel_calibration(state: State<'_, AppState>) {
+    state.calibration.cancel();
 }
 
 #[tauri::command]
@@ -307,6 +368,8 @@ pub fn run() {
                 .map_err(|error| Box::<dyn std::error::Error>::from(error.to_string()))?;
             app.manage(AppState {
                 capture: CaptureManager::default(),
+                calibration: calibration::CalibrationManager::default(),
+                serial_gate: parking_lot::Mutex::new(()),
                 firmware: FirmwareManager::default(),
                 downloads: DownloadManager::default(),
                 settings,
@@ -322,8 +385,18 @@ pub fn run() {
             });
             Ok(())
         })
+        .on_window_event(|window, event| {
+            if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+                window.state::<AppState>().calibration.shutdown();
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             list_serial_devices,
+            get_calibration_state,
+            connect_calibration,
+            disconnect_calibration,
+            run_calibration,
+            cancel_calibration,
             start_capture,
             stop_capture,
             get_capture_state,

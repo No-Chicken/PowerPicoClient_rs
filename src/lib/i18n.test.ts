@@ -11,6 +11,7 @@ describe('translations', () => {
   it('keeps all supported locales structurally compatible', () => {
     for (const messages of [zhHk, ja]) {
       expect(Object.keys(messages.nav)).toEqual(Object.keys(en.nav));
+      expect(Object.keys(messages.calibration)).toEqual(Object.keys(en.calibration));
       expect(Object.keys(messages.firmware)).toEqual(Object.keys(en.firmware));
       expect(Object.keys(messages.settings)).toEqual(Object.keys(en.settings));
     }

@@ -2,20 +2,23 @@
   import { onMount, onDestroy } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { check } from '@tauri-apps/plugin-updater';
-  import { Activity, Cpu, Settings as SettingsIcon, Zap } from '@lucide/svelte';
+  import { Activity, SlidersHorizontal, Cpu, Settings as SettingsIcon, Zap } from '@lucide/svelte';
   import { api, formatAppError, onEvent, type UnlistenFn } from './lib/api';
   import { setLocale } from './lib/i18n';
   import { defaultWaveformMetrics } from './lib/metricLayout';
   import type { AppSettings } from './lib/types';
+  import CalibrationPage from './lib/pages/CalibrationPage.svelte';
   import FirmwarePage from './lib/pages/FirmwarePage.svelte';
   import SettingsPage from './lib/pages/SettingsPage.svelte';
   import WaveformPage from './lib/pages/WaveformPage.svelte';
   import StatusDot from './lib/components/StatusDot.svelte';
   import Toast from './lib/components/Toast.svelte';
 
-  type Page = 'waveform' | 'firmware' | 'settings';
+  type Page = 'waveform' | 'calibration' | 'firmware' | 'settings';
   let page: Page = 'waveform';
-  let connected = false;
+  let capturing = false;
+  let calibrationConnected = false;
+  $: connected = capturing || calibrationConnected;
   let settings: AppSettings = {
     theme: 'system', language: 'auto',
     waveformMetrics: [...defaultWaveformMetrics],
@@ -24,6 +27,7 @@
     localFirmwareVersion: '', localFirmwareReleaseDate: '',
   };
   let toast = { message: '', tone: 'info' as 'info' | 'error' | 'success' };
+  let unlistenCalibration: UnlistenFn | undefined;
   let unlistenCapture: UnlistenFn | undefined;
   let media: MediaQueryList | undefined;
   const mediaChanged = () => { if (settings.theme === 'system') applyTheme('system'); };
@@ -53,8 +57,10 @@
     try {
       settings = await api.getSettings();
       setLocale(settings.language); applyTheme(settings.theme); applyScale(settings.uiScale);
-      const state = await api.captureState(); connected = state.status === 'capturing';
-      unlistenCapture = await onEvent<{ status: string }>('capture-state-changed', (next) => { connected = next.status === 'capturing'; });
+      const state = await api.captureState(); capturing = state.status === 'capturing';
+      calibrationConnected = (await api.calibrationState()).connected;
+      unlistenCalibration = await onEvent<{ connected: boolean }>('calibration-state', (next) => { calibrationConnected = next.connected; });
+      unlistenCapture = await onEvent<{ status: string }>('capture-state-changed', (next) => { capturing = next.status === 'capturing'; });
       media = matchMedia('(prefers-color-scheme: dark)');
       media.addEventListener('change', mediaChanged);
       if (settings.checkUpdateAtStartup) {
@@ -67,7 +73,7 @@
       }
     } catch (error) { notify(formatAppError(error, $_('errors.serialPermission')), 'error'); }
   });
-  onDestroy(() => { unlistenCapture?.(); media?.removeEventListener('change', mediaChanged); });
+  onDestroy(() => { unlistenCalibration?.(); unlistenCapture?.(); media?.removeEventListener('change', mediaChanged); });
 </script>
 
 <div class="shell">
@@ -75,13 +81,14 @@
     <div class="brand"><div class="logo"><Zap size={21} fill="currentColor"/></div><div><strong>PowerPico</strong><span>Client</span></div></div>
     <nav>
       <button class:active={page === 'waveform'} onclick={() => page = 'waveform'} aria-label={$_('nav.waveform')}><Activity size={19}/><span>{$_('nav.waveform')}</span></button>
+      <button class:active={page === 'calibration'} onclick={() => page = 'calibration'} aria-label={$_('nav.calibration')}><SlidersHorizontal size={19}/><span>{$_('nav.calibration')}</span></button>
       <button class:active={page === 'firmware'} onclick={() => page = 'firmware'} aria-label={$_('nav.firmware')}><Cpu size={19}/><span>{$_('nav.firmware')}</span></button>
       <button class:active={page === 'settings'} onclick={() => page = 'settings'} aria-label={$_('nav.settings')}><SettingsIcon size={19}/><span>{$_('nav.settings')}</span></button>
     </nav>
     <div class="connection"><StatusDot active={connected}/><span>{connected ? $_('app.connected') : $_('app.disconnected')}</span></div>
   </aside>
   <main>
-    {#if page === 'waveform'}<WaveformPage {notify} {settings}/>{:else if page === 'firmware'}<FirmwarePage {notify} {settings} updateSettings={updateSettings}/>{:else}<SettingsPage {settings} update={updateSettings} {notify}/>{/if}
+    {#if page === 'waveform'}<WaveformPage {notify} {settings}/>{:else if page === 'calibration'}<CalibrationPage {notify}/>{:else if page === 'firmware'}<FirmwarePage {notify} {settings} updateSettings={updateSettings}/>{:else}<SettingsPage {settings} update={updateSettings} {notify}/>{/if}
   </main>
 </div>
 <Toast message={toast.message} tone={toast.tone} onClose={() => toast = { ...toast, message: '' }}/>

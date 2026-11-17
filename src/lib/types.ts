@@ -164,3 +164,10 @@ export interface AppError {
   code: string;
   message: string;
 }
+
+export interface CalibrationValues { gains: number[]; offsetsUa: number[] }
+export interface ZeroStatistics { range: number; sampleCount: number; zeroLsb: number; meanLsb: number; noiseLsb: number; minimumLsb: number; maximumLsb: number }
+export interface CalibrationState {
+  deviceId: string | null; connected: boolean; busy: boolean; stage: string; samples: number;
+  values: CalibrationValues | null; statistics: ZeroStatistics[]; error: string | null; possiblyCommitted: boolean;
+}

@@ -1,8 +1,8 @@
 <div align="center">
   <h1 align="center">PowerPico Client</h1>
-  <p align="center">面向 PowerPico 的跨平台数据采集、波形分析与固件升级客户端</p>
+  <p align="center">面向 PowerPico 的跨平台数据采集、波形分析、校准与固件升级客户端</p>
 
-  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.2.1-blue" alt="Version 0.2.1"></a>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.3.0-blue" alt="Version 0.3.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
   <img src="https://img.shields.io/badge/Tauri-v2-24C8DB" alt="Tauri v2">
   <img src="https://img.shields.io/badge/Svelte-v5-FF3E00" alt="Svelte v5">
@@ -16,7 +16,7 @@
 
 ## 📖 项目简介
 
-**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，提供高速数据采集、实时波形、精确区间分析、记录导入导出、固件升级、缓存管理和客户端更新能力。
+**PowerPico Client** 是使用 Tauri 2、Svelte 5 与 Rust 实现的 PowerPico 桌面客户端，提供高速数据采集、实时波形、精确区间分析、记录导入导出、三档校准、固件升级、缓存管理和客户端更新能力。
 
 <p align="center">
   <a href="https://github.com/No-Chicken/Power-Pico">Power-Pico 主项目</a> |
@@ -35,6 +35,7 @@
 - **实时波形**：支持实时跟随、历史浏览、时间/电压/电流独立缩放和平移，以及原始采样点精确读取。
 - **多级数据**：兼容原客户端 L0/L1-L5 分级记录和 LOD 波形读取，支持 BIN/CSV 导入导出。
 - **统计分析**：提供全局、最近 10 分钟、最近 1 分钟、最近 1 秒统计，以及右键拖选精确区间分析。
+- **设备校准**：支持读取三档参数、手动调整增益和零点、自动零点校准与出厂恢复；写入后回读核对，采集中应用设备保存的参数。
 - **固件升级**：支持官方固件查询与缓存、自定义 BIN、Bootloader 重新枚举、YMODEM 刷写、进度显示和取消。
 - **跨平台体验**：支持简体中文、繁体中文、英语、日语、系统语言模式，以及主题、界面缩放和渲染质量设置。
 - **更新与维护**：支持客户端 OTA、缓存空间统计与清理、内部临时记录自动回收和平台滚动日志。
@@ -56,49 +57,11 @@
 
 请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
 
-### macOS Apple Silicon
+平台安装和构建说明：
 
-1. 下载 `PowerPico-Client_<版本>_macos_aarch64.dmg`。
-2. 打开 DMG，将 `PowerPico Client.app` 拖入“应用程序”。
-3. 安装完成后在 Finder 侧边栏推出 `PowerPico Client` 磁盘映像卷。
-4. 首次运行时，在 Finder 中按住 Control 点击应用并选择“打开”。
-
-macOS 安装包目前未签名且未公证。如果系统仍然阻止运行，可在确认安装包来自本仓库后执行：
-
-```zsh
-xattr -dr com.apple.quarantine "/Applications/PowerPico Client.app"
-open "/Applications/PowerPico Client.app"
-```
-
-设置页提供缓存空间统计、一键清理和完整卸载。完整卸载会将 App 移入废纸篓、删除应用数据，并推出仍挂载且经过应用标识校验的 PowerPico Client DMG 卷；下载目录中的原始 DMG 文件不会被删除。
-
-客户端支持应用内检查、下载、签名校验和安装更新。OTA 更新包不会挂载新的 DMG 卷。
-
-### Windows x86_64
-
-提供两种 x86_64 分发格式：
-
-| 格式 | 文件 | 使用方式 |
-| --- | --- | --- |
-| NSIS 安装版 | `PowerPico-Client_<版本>_windows_x86_64-setup.exe` | 按当前用户安装，提供开始菜单及系统卸载入口；缺少 WebView2 时引导安装 |
-| 便携 ZIP | `PowerPico-Client_<版本>_windows_x86_64-portable.zip` | 解压全部文件后运行 `powerpico-client.exe`，电脑需已有 WebView2 Runtime |
-
-便携版附带使用说明、GPL 许可证和第三方声明。它是免安装分发，设置、固件、采集记录和日志仍使用当前用户的 AppData，与安装版共享；移动程序文件夹不会迁移这些数据。更新便携版时关闭客户端，再解压替换程序文件。应用内更新走 NSIS 安装器，会转为安装版。官方设备使用 Windows USB CDC 串口驱动。
-
-### Ubuntu / Debian Linux
-
-DEB 安装包：
-
-```bash
-sudo apt install ./PowerPico-Client_<版本>_amd64.deb
-```
-
-AppImage：
-
-```bash
-chmod +x PowerPico-Client_<版本>_amd64.AppImage
-./PowerPico-Client_<版本>_amd64.AppImage
-```
+- [macOS 安装与构建](./docs/platforms/macos.md)
+- [Linux 安装与构建](./docs/platforms/linux.md)
+- [Windows 安装与构建](./docs/platforms/windows.md)
 
 ---
 
@@ -111,6 +74,7 @@ chmod +x PowerPico-Client_<版本>_amd64.AppImage
 | 数据采集与波形 | ✅ | ✅ | ✅ |
 | 记录导入导出 | ✅ | ✅ | ✅ |
 | 设备固件升级 | ✅ | ✅ | ✅ |
+| 三档校准 | ⚠️ 待真机验收 | ✅（Arch Linux 真机） | ⚠️ 待真机验收 |
 | 缓存管理 | ✅ | ✅ | 🚧 |
 | 应用内卸载 | ✅ | ➖ | ➖（使用系统卸载入口） |
 | 客户端 OTA | ✅ | 🚧 | 🚧 |
@@ -118,65 +82,20 @@ chmod +x PowerPico-Client_<版本>_amd64.AppImage
 
 macOS DMG 当前未进行 Apple Developer ID 签名和公证，因此首次启动可能需要通过 Finder 手动确认。DEB 包基于 Ubuntu 22.04 构建，理论上可用于 Debian 11+、Ubuntu 22.04+、Linux Mint 21+；AppImage 可在多数 x86_64 Linux 发行版运行。RPM 当前不在发布计划内。
 
-### Linux 串口权限
-
-客户端不应以 root 运行。Ubuntu/Debian 用户加入 `dialout`，Arch Linux 用户加入 `uucp`，然后注销并重新登录：
-
-```bash
-sudo usermod -aG dialout "$USER"  # Ubuntu / Debian
-sudo usermod -aG uucp "$USER"     # Arch Linux
-```
-
-真机验收项目见 [Linux 测试清单](./docs/linux-testing.md)。
-
 ---
 
 ## 🛠️ 开发与构建
 
-需要 Rust 1.77.2+、Node.js 20+ 和 pnpm 10+。
+需要 Rust 1.77.2+、Node.js 20+ 和 pnpm 10+。各平台依赖和构建方式见上方平台指南。
 
 ```bash
 pnpm install
 pnpm tauri dev
 ```
 
-Arch Linux 开发依赖：
+Windows 实机验收见 [Windows 测试记录](./docs/windows-testing.md)。校准操作、参数范围和 Linux 真机验收见 [校准功能与测试记录](./docs/calibration-testing.md)。
 
-```bash
-sudo pacman -S --needed base-devel webkit2gtk-4.1 libappindicator-gtk3 librsvg systemd
-```
-
-### Windows 本地开发与构建
-
-安装 Node.js 20+、Rust 的 `x86_64-pc-windows-msvc` 工具链、Visual Studio Build Tools（C++ 桌面工具与 Windows SDK）和 WebView2 Runtime。
-
-若 PowerShell 提示禁止运行 `pnpm.ps1` 或 `tauri.ps1`，为当前用户配置脚本策略，或使用 `pnpm.cmd`：
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-pnpm install --frozen-lockfile
-pnpm tauri dev
-# 正式构建并生成 NSIS 安装包
-pnpm tauri build
-```
-
-开发启动使用 `tauri dev`；`tauri build dev` 不是开发启动命令。项目本地 CLI 通过 `pnpm tauri` 调用，无需另行全局安装。
-
-Windows 平台配置自动选择当前用户 NSIS 安装。直接 `pnpm tauri build` 可在没有 updater 私钥的情况下构建本地安装包；产物位于 `src-tauri/target/release/`。
-
-同时生成 NSIS 与便携 ZIP 的完整 Windows 验证和打包命令：
-
-```powershell
-pnpm tauri:build:windows
-# 已缓存全部依赖时离线运行
-pnpm tauri:build:windows -Offline
-# 正式发布：从环境读取 TAURI_SIGNING_PRIVATE_KEY 和可选密码
-pnpm tauri:build:windows -Updater
-```
-
-脚本自动发现 MSVC Build Tools、安装锁定依赖、运行 Svelte / 前端测试 / Rust 格式 / Clippy / 后端测试，构建 x64 NSIS 和便携 ZIP，输出统一文件名和包含两种产物的 `SHA256SUMS` 到 `artifacts/windows/`。`-SkipChecks` 仅用于已经完成检查后的重复打包。显式 x64 目标的原始产物在 `src-tauri/target/x86_64-pc-windows-msvc/release/`。
-
-`-Updater` 使用现有发布密钥生成 `.exe.sig`，GitHub Actions 将安装器、便携 ZIP 和安装器签名纳入 Release；`latest.json` 的 `windows-x86_64` 指向 NSIS 安装器。便携 ZIP 使用 `SHA256SUMS` 校验，不作为 Tauri updater 载荷。Tauri 更新签名与 Windows Authenticode 代码签名是两个机制；本项目尚未配置 Authenticode。完整实机验收范围见 [Windows 测试记录](./docs/windows-testing.md)。
+自动零点校准前请断开负载，保持零电流和稳定供电。校准连接占用串口，完成后断开校准连接，再开始波形采集或固件升级。旧固件不支持校准协议时，采集仍使用标称换算参数。
 
 ### 质量检查
 
@@ -191,21 +110,7 @@ cargo clippy -- -D warnings
 cargo test
 ```
 
-### 构建安装包
-
-macOS ARM64 未签名 DMG：
-
-```bash
-pnpm tauri build --bundles app,dmg
-```
-
-本地 Linux 构建使用固定的 Ubuntu 22.04 Docker 容器：
-
-```bash
-pnpm tauri:build:linux
-```
-
-Linux 产物输出到 `artifacts/linux/`。GitHub Actions 不使用该容器，而是在 `ubuntu-22.04` runner 上原生构建 DEB 和 AppImage。
+平台安装包的构建命令见 [macOS 指南](./docs/platforms/macos.md)、[Linux 指南](./docs/platforms/linux.md)和 [Windows 指南](./docs/platforms/windows.md)。
 
 ---
 

@@ -7,7 +7,6 @@
 - Windows 11 26H2 x64 虚拟机；12 GiB 内存。
 - Node.js 22.23.5、pnpm 10.18.1、Rust 1.100.0 MSVC、Visual Studio Build Tools 和 Windows SDK 10.0.22621.0。
 - Git 2.56.1；工作区 `C:\workspace\PowerPicoClient_rs`。
-- PowerShell 当前用户策略为 `RemoteSigned`，已验证 `pnpm.ps1` / `tauri.ps1` 可执行。
 - Svelte 检查 0 错误、0 警告；前端 15 项测试通过；Windows Rust 后端 25 项测试通过。
 - `pnpm tauri build --ci -- --locked --offline` 成功生成 release EXE 与 x64 NSIS 安装包。离线参数依赖本机已有缓存；首次构建按 README 使用 `pnpm tauri build`。
 
@@ -48,8 +47,6 @@
 初始状态下串口可打开但没有字节流；设备物理断电重插后，宿主机 3 秒接收 243,175 字节、30,020 个有效样本、0 个无效样本。设置 `guestReset='off'` 后再次冷启动虚拟机，Windows 3 秒接收 243,747 字节，并通过上述应用采集测试。这支持 USB 复位与固件输出状态相关的判断，尚未通过修改固件定位根因。
 
 宿主机通过仅匹配该设备 VID/PID/序列号的 udev 规则赋予运行 QEMU 的用户 USB 节点访问权限。当前规则使用序列号 `398839533132`；换设备时应更新规则。libvirt 配置以 VID/PID 匹配直通，因此宿主机有多台同型号设备时需要进一步区分。
-
-不使用全局 `Unrestricted` 修复脚本问题。当前用户可按 README 配置 `RemoteSigned`，或直接使用 `pnpm.cmd`。
 
 ## Bootloader 实机更新（2026-11-17）
 

@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AppSettings,
+  CalibrationState,
   AppError,
   CaptureState,
   CaptureSummary,
@@ -18,6 +19,11 @@ import type {
 } from './types';
 
 export const api = {
+  calibrationState: () => invoke<CalibrationState>('get_calibration_state'),
+  connectCalibration: (deviceId: string) => invoke<CalibrationState>('connect_calibration', { deviceId }),
+  disconnectCalibration: () => invoke<CalibrationState>('disconnect_calibration'),
+  runCalibration: (operation: 'read' | 'auto' | 'manual' | 'reset', range?: number, gain?: number, offsetUa?: number) => invoke<void>('run_calibration', { operation, range, gain, offsetUa }),
+  cancelCalibration: () => invoke<void>('cancel_calibration'),
   listDevices: () => invoke<SerialDevice[]>('list_serial_devices'),
   startCapture: (deviceId: string) => invoke<CaptureState>('start_capture', { deviceId }),
   stopCapture: () => invoke<CaptureState>('stop_capture'),

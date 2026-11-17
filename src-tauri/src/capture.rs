@@ -108,6 +108,18 @@ impl CaptureManager {
                     .open()
                     .map_err(|error| CoreError::from_serial_open(&device.system_path, error))?;
                 port.clear(serialport::ClearBuffer::Input)?;
+                // Older firmware may not implement CAL_GET. Keep its nominal conversion.
+                let mut control = crate::calibration::Protocol::new(&mut *port);
+                let calibration = match control.read_values() {
+                    Ok(values) => values,
+                    Err(error) => {
+                        tracing::warn!(
+                            "calibration read unavailable; using nominal conversion: {error}"
+                        );
+                        Default::default()
+                    }
+                };
+                port.clear(serialport::ClearBuffer::Input)?;
                 let mut writer = RecordWriter::create(&records_dir)?;
                 *record_path.write() = Some(writer.l0_path.clone());
                 let active = CaptureState {
@@ -118,7 +130,7 @@ impl CaptureManager {
                 };
                 *state.write() = active.clone();
                 app.emit("capture-state-changed", &active).ok();
-                let mut parser = FrameParser::default();
+                let mut parser = FrameParser::with_calibration(calibration);
                 let mut last_summary = Instant::now();
                 let mut last_ready = Instant::now();
                 let (sender, receiver) = crossbeam_channel::bounded::<ReaderMessage>(64);

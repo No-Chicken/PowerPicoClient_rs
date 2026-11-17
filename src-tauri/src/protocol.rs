@@ -1,6 +1,8 @@
-use crate::types::Sample;
+use crate::{
+    calibration::{Frame, MixedParser, Values, SCALES},
+    types::Sample,
+};
 
-const HEADER: [u8; 2] = [0xAA, 0x55];
 const META_SIZE: usize = 11;
 const SAMPLE_SIZE: usize = 7;
 const SAMPLE_INTERVAL_US: f64 = 100.0;
@@ -12,48 +14,26 @@ const MAX_VOLT_ADC: u16 = (MAX_INPUT_VOLTAGE / VOLT_FACTOR) as u16;
 
 #[derive(Default)]
 pub struct FrameParser {
-    buffer: Vec<u8>,
+    stream: MixedParser,
+    calibration: Values,
     base_timestamp_us: Option<u64>,
 }
 
 impl FrameParser {
+    pub fn with_calibration(calibration: Values) -> Self {
+        Self {
+            calibration,
+            ..Self::default()
+        }
+    }
     pub fn push(&mut self, bytes: &[u8]) -> Vec<Sample> {
-        self.buffer.extend_from_slice(bytes);
         let mut output = Vec::new();
-
-        loop {
-            if self.buffer.len() < META_SIZE + SAMPLE_SIZE {
-                break;
-            }
-            let Some(header_index) = self.buffer.windows(2).position(|window| window == HEADER)
-            else {
-                let keep = usize::from(self.buffer.last() == Some(&HEADER[0]));
-                let tail = self.buffer.len().saturating_sub(keep);
-                self.buffer.drain(..tail);
-                break;
-            };
-            if header_index > 0 {
-                self.buffer.drain(..header_index);
-            }
-            if self.buffer.len() < META_SIZE {
-                break;
-            }
-
-            let timestamp_us = u64::from_le_bytes(
-                self.buffer[2..10]
-                    .try_into()
-                    .expect("fixed timestamp slice"),
-            );
-            let count = self.buffer[10] as usize;
-            if count == 0 {
-                self.buffer.drain(..1);
+        for frame in self.stream.push(bytes) {
+            let Frame::Adc(frame) = frame else {
                 continue;
-            }
-            let frame_len = META_SIZE + count * SAMPLE_SIZE;
-            if self.buffer.len() < frame_len {
-                break;
-            }
-            let frame: Vec<u8> = self.buffer.drain(..frame_len).collect();
+            };
+            let timestamp_us = u64::from_le_bytes(frame[2..10].try_into().unwrap());
+            let count = frame[10] as usize;
             let base = *self.base_timestamp_us.get_or_insert(timestamp_us);
 
             for index in 0..count {
@@ -70,15 +50,12 @@ impl FrameParser {
                     continue;
                 }
 
-                let resistance = match range {
-                    1 => 50.0,
-                    2 => 0.5,
-                    3 => 0.005,
-                    _ => unreachable!(),
-                };
-                let current_factor = (3.0 / 4096.0 / 50.0 / resistance) * 1_000_000.0;
+                let i = range as usize - 1;
                 let voltage = voltage_adc as f32 * VOLT_FACTOR;
-                let current = (current_adc as f32 - reference_adc as f32) * current_factor
+                let current = ((current_adc as f64 - reference_adc as f64)
+                    * SCALES[i]
+                    * self.calibration.gains[i]
+                    + self.calibration.offsets_ua[i]) as f32
                     - voltage / (VOLT_RES_HIGH + VOLT_RES_LOW) * 1_000_000.0;
                 let time = ((timestamp_us - base) as f64 + index as f64 * SAMPLE_INTERVAL_US)
                     / 1_000_000.0;
@@ -121,6 +98,29 @@ mod tests {
         assert_eq!(samples.len(), 2);
         assert_eq!(samples[0].time, 0.0);
         assert!((samples[1].time - 0.0001).abs() < 1e-9);
+    }
+
+    #[test]
+    fn applies_saved_calibration_before_divider_current_for_all_ranges() {
+        let values = Values {
+            gains: [1.1, 0.9, 1.05],
+            offsets_ua: [-0.5, 2., -1000.],
+        };
+        let data = frame(
+            1000,
+            &[
+                (1, 100, 2050, 2048),
+                (2, 100, 2050, 2048),
+                (3, 100, 2050, 2048),
+            ],
+        );
+        let samples = FrameParser::with_calibration(values).push(&data);
+        assert_eq!(samples.len(), 3);
+        for (i, sample) in samples.iter().enumerate() {
+            let expected = 2. * SCALES[i] * values.gains[i] + values.offsets_ua[i]
+                - sample.voltage as f64 / 1.1;
+            assert!((sample.current as f64 - expected).abs() < 0.001);
+        }
     }
 
     #[test]
