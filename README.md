@@ -116,6 +116,7 @@ cargo build --workspace
 | :--- | :--- |
 | `POWERPICO_PAGE=waveform\|calibration\|firmware\|settings` | 启动时打开指定页面。 |
 | `POWERPICO_AUTOSTART=1` | 设备就绪后自动开始采集，便于检查实时波形。 |
+| `POWERPICO_THEME=light\|dark\|system` | 本次运行强制主题，便于对比两套配色。 |
 
 ### AI 编码助手技能
 
