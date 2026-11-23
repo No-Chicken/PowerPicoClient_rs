@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/app"]
+exclude = ["src-tauri"]
+
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/No-Chicken/PowerPicoClient_rs"
+rust-version = "1.98"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

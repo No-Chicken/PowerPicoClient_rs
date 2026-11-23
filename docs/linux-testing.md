@@ -1,37 +1,57 @@
 # Linux 测试清单
 
-发布目标为 Ubuntu/Debian x86_64。日常开发和真机调试可在 Arch Linux x86_64 上执行；本地 DEB/AppImage 使用 Ubuntu 22.04 容器生成，GitHub Actions 则在 Ubuntu 22.04 runner 原生构建。
+日常开发和真机调试在 Arch Linux x86_64 / KDE Wayland 上进行；CI 在 Ubuntu 24.04 runner 上执行格式、lint、测试与构建。
 
 ## 自动检查
 
 ```bash
-pnpm install --frozen-lockfile
-pnpm check
-pnpm test
-pnpm build
-pnpm tauri dev
-cd src-tauri
 cargo fmt --check
-cargo clippy --locked -- -D warnings
-cargo test --locked
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo build --workspace
 ```
 
-## 安装包与桌面集成
+## 启动与渲染
 
-1. 在安装 Docker 的宿主机执行 `pnpm tauri:build:linux`，确认 `artifacts/linux/` 中生成 DEB 和 AppImage。
-2. 确认容器构建没有复用宿主机的 `node_modules` 或 `src-tauri/target`。
-3. 在 Ubuntu 22.04/24.04 启动 AppImage 并安装 DEB，检查浅色、深色和跟随系统主题。
-4. 检查固件文件、记录导入和导出对话框。
-5. 检查设置、记录和日志分别写入系统应用数据、缓存和日志目录。
-6. 关闭应用并确认没有残留 PowerPico Client 进程。
+- `cargo run -p powerpico-app` 能打开 1180×800 的窗口，侧栏、页面与滚动区域布局正常。
+- 终端出现 `radv is not a conformant Vulkan implementation` 属正常提示；GPUI 通过 Vulkan 渲染。
+- 切换主题（跟随系统/浅色/深色）后所有面板、按钮、输入框同步换色，无需重启。
+- 缩放 100%–200% 后文字随之变化，布局不重叠。
+- 关闭窗口后进程退出，串口被释放（`lsof /dev/ttyACM*` 为空）。
 
-## PowerPico 真机
+## 串口权限
 
-1. 在未加入串口用户组的测试账号上尝试采集，确认界面显示可操作的权限提示。
-2. 加入 `dialout`（Ubuntu/Debian）或 `uucp`（Arch）并重新登录，确认设备能被发现。
-3. 以 1.5 Mbps 连续采集至少 15 分钟，检查实时波形、统计、停止、导出和重新导入。
-4. 采集过程中拔出设备，确认应用进入错误状态且可以重新刷新并连接设备。
-5. 连接其他 USB 串口设备后执行固件升级，确认 bootloader 重枚举不会误选无关设备。
-6. 完成 YMODEM 上传并启动新固件，再次连接并采集数据。
+- 未加入 `uucp` 组时连接设备会提示串口权限错误，提示文案与旧版一致。
+- `sudo usermod -aG uucp $USER` 并重新登录后可以枚举与连接。
 
-记录测试发行版、桌面环境、会话类型（Wayland/X11）、PowerPico VID/PID、固件版本和每项结果。Ubuntu 22.04 或 24.04 的安装、启动和真机流程全部通过后，Linux 包才可作为发布候选。
+## 采集与波形
+
+```bash
+POWERPICO_AUTOSTART=1 cargo run -p powerpico-app
+```
+
+- 指标卡片每 33 ms 刷新，采样点计数持续增长。
+- 滚轮缩放指针所在轴、左键拖动平移时间轴、右键拖动出现紫色分析区间并在松手后显示统计。
+- 点击曲线上任意位置出现读数卡片，Esc 或点击空白处不崩溃；读数时间、电压、电流、瞬时功率与采样点一致。
+- 导入旧版 `.bin` 记录、导出 CSV/BIN、清除记录后图表回到空态。
+
+## 校准
+
+- 连接后读取参数，三档增益与偏移显示正确，High 档为 mA。
+- 写入前出现确认对话框，取消不会写设备。
+- 自动零点校准进度条与 `n / 60,000` 同步，取消可用；完成后参数回读一致。
+- 校准期间切到其他页面再回来，状态保持；关闭窗口会等待档位恢复。
+
+## 固件
+
+- 官方固件版本与发布日期从固件服务读取，下载进度条更新，完成后版本写入设置。
+- 自定义 BIN 通过 GTK 文件对话框选择。
+- 刷写时设备重新枚举，进度条推进，完成后弹出成功提示；取消后设备回到正常模式。
+
+## 日志
+
+```bash
+tail -f ~/.local/share/com.openfeasttech.powerpico-client/logs/powerpico.log.$(date +%F)
+```
+
+采集、校准、刷写与网络错误都应留下记录，且不包含采样数据本身。

@@ -1,13 +1,6 @@
-# 前端依赖与构建产物
-node_modules/
-dist/
-.vite/
-coverage/
-artifacts/
-
-# Rust / Tauri 生成文件
-src-tauri/target/
-src-tauri/gen/schemas/
+# Rust 构建产物
+/target/
+**/target/
 
 # 日志与本地环境文件
 *.log

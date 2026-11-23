@@ -1,0 +1,24 @@
+[package]
+name = "powerpico-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "PowerPico Client built with GPUI"
+
+[[bin]]
+name = "powerpico-client"
+path = "src/main.rs"
+
+[dependencies]
+crossbeam-channel = "0.5"
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+powerpico-core = { path = "../core" }
+gpui-kit = "=0.9.1"
+ely-gpui-component = { git = "https://github.com/ELY-Open-Source/Ely-GPUI-Components" }
+rfd = { version = "0.15", default-features = false, features = ["gtk3"] }
+open = "5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
