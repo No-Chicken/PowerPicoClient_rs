@@ -22,3 +22,6 @@ power_pico_pyqt
 PowerPico_Client
 .tauri-signing-private.key
 .tauri-signing-private.key.pub
+
+# 本地助手工作区数据
+.workbuddy/
