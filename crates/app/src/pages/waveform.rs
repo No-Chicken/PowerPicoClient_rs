@@ -203,7 +203,10 @@ pub fn page(
             format!("{:.2} V", (voltage_range.min + voltage_range.max) / 2.0),
             format!("{:.2} V", voltage_range.min),
         ],
-    );
+    )
+    .id("voltage-axis")
+    .cursor_crosshair()
+    .on_scroll(zoom_handler(this.clone()));
     let current_axis = axis_column(
         &colors,
         RIGHT_AXIS,
@@ -213,15 +216,20 @@ pub fn page(
             format!("{:.0} µA", (current_range.min + current_range.max) / 2.0),
             format!("{:.0} µA", current_range.min),
         ],
-    );
+    )
+    .id("current-axis")
+    .cursor_crosshair()
+    .on_scroll(zoom_handler(this.clone()));
 
     let plot = chart(app, &colors, cx);
     let empty = app.waveform.series.time.is_empty();
     let plot_area = div()
+        .id("plot-surface")
         .relative()
         .flex_1()
         .min_w_0()
         .h_full()
+        .on_scroll(zoom_handler(this.clone()))
         .child(plot)
         .when(empty, |area| {
             area.child(
@@ -330,7 +338,8 @@ pub fn page(
         .py(px(12.0))
         .gap(px(6.0))
         .child(heading)
-        .child(
+        .child(chart_row(
+            cx,
             div()
                 .flex()
                 .flex_1()
@@ -338,7 +347,7 @@ pub fn page(
                 .child(voltage_axis)
                 .child(plot_area)
                 .child(current_axis),
-        )
+        ))
         .child(ticks);
 
     // ------------------------------------------------------------ navigation
@@ -614,7 +623,7 @@ fn axis_column(
     width: f32,
     leading: bool,
     labels: [String; 3],
-) -> impl IntoElement {
+) -> gpui::Div {
     let column = div()
         .flex()
         .flex_col()
@@ -747,7 +756,6 @@ fn chart(
         marker_edge: colors.overlay,
     };
     let paint = snapshot.clone();
-    let this = cx.entity().downgrade();
 
     let canvas = canvas(
         move |bounds, _, _| {
@@ -758,11 +766,33 @@ fn chart(
     )
     .size_full();
 
-    div()
-        .id("plot-surface")
-        .relative()
-        .size_full()
-        .child(canvas)
+    div().size_full().child(canvas)
+}
+
+/// Wheel over the plot or either axis strip zooms that axis.
+fn zoom_handler(
+    this: gpui::WeakEntity<PowerPico>,
+) -> impl Fn(&ScrollEvent, &mut Window, &mut gpui::App) + 'static {
+    move |event: &ScrollEvent, _, cx| {
+        let delta = match event.delta {
+            ScrollDelta::Lines(lines) => lines.y as f64 * 24.0,
+            ScrollDelta::Pixels(pixels) => pixels.y.as_f32() as f64,
+        };
+        this.update(cx, |app, cx| {
+            app.chart_zoom(event.position, delta);
+            cx.notify();
+        })
+        .ok();
+    }
+}
+
+/// The chart's row. Mouse events bubble from the plot and both axis strips into
+/// it, so one handler set covers the whole chart. Wheel events do not bubble,
+/// which is why each strip registers its own scroll handler.
+fn chart_row(cx: &mut Context<PowerPico>, content: gpui::Div) -> impl IntoElement {
+    let this = cx.entity().downgrade();
+    content
+        .id("chart-row")
         .cursor_crosshair()
         .on_mouse_down(MouseButton::Left, {
             let this = this.clone();
@@ -788,7 +818,11 @@ fn chart(
             let this = this.clone();
             move |event: &MouseMoveEvent, _, cx| {
                 this.update(cx, |app, cx| {
-                    if app.chart_move(event.position) {
+                    // A release outside the chart never reached the row; the
+                    // next move without a button ends the stale gesture.
+                    if event.pressed_button.is_none() {
+                        app.chart_end(event.position);
+                    } else if app.chart_move(event.position) {
                         cx.notify();
                     }
                 })
@@ -810,20 +844,6 @@ fn chart(
             move |event: &MouseUpEvent, _, cx| {
                 this.update(cx, |app, cx| {
                     app.chart_end(event.position);
-                    cx.notify();
-                })
-                .ok();
-            }
-        })
-        .on_scroll({
-            let this = this.clone();
-            move |event: &ScrollEvent, _, cx| {
-                let delta = match event.delta {
-                    ScrollDelta::Lines(lines) => lines.y as f64 * 24.0,
-                    ScrollDelta::Pixels(pixels) => pixels.y.as_f32() as f64,
-                };
-                this.update(cx, |app, cx| {
-                    app.chart_zoom(event.position, delta);
                     cx.notify();
                 })
                 .ok();

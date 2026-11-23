@@ -65,7 +65,16 @@ impl PowerPico {
                 )
             }
         };
-        let settings = core.settings();
+        let mut settings = core.settings();
+        // Developer aid: `POWERPICO_THEME=light|dark|system` overrides the
+        // stored choice for one run, which makes both palettes easy to compare.
+        if let Ok(forced) = std::env::var("POWERPICO_THEME") {
+            settings.theme = match forced.as_str() {
+                "light" => ThemeMode::Light,
+                "dark" => ThemeMode::Dark,
+                _ => ThemeMode::System,
+            };
+        }
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
 
@@ -471,16 +480,9 @@ impl PowerPico {
     fn apply_local_settings(&mut self, settings: &AppSettings) {
         self.lang = Lang::resolve(settings.language.clone());
         self.settings = settings.clone();
-        if settings.theme != ThemeMode::System {
-            let mode = if settings.theme == ThemeMode::Dark {
-                Mode::Dark
-            } else {
-                Mode::Light
-            };
-            self.applied_mode = Some(mode);
-        } else {
-            self.applied_mode = None;
-        }
+        // `applied_mode` is left to `render`: it is the record of what the
+        // theme actually shows, not of what was requested. Writing the request
+        // here made the next frame believe the change had already landed.
     }
 
     // --------------------------------------------------------------- helpers
@@ -849,9 +851,8 @@ impl PowerPico {
 
 impl Render for PowerPico {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = cx.theme().colors.clone();
-
-        // System theme follows the window; a stored choice wins over it.
+        // System theme follows the window; a stored choice wins over it. Apply
+        // the mode before reading colors so this frame already paints with it.
         let wanted = match self.settings.theme {
             ThemeMode::Light => Mode::Light,
             ThemeMode::Dark => Mode::Dark,
@@ -873,6 +874,7 @@ impl Render for PowerPico {
             Theme::update(cx, |theme| theme.font_scale = scale);
             self.applied_scale = self.settings.ui_scale;
         }
+        let colors = cx.theme().colors.clone();
         self.window_width = window.viewport_size().width.as_f32();
 
         let body = match self.page {
