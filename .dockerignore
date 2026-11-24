@@ -1,9 +1,0 @@
-.git
-.agents
-.codex
-node_modules
-dist
-artifacts
-src-tauri/target
-src-tauri/gen
-*.log

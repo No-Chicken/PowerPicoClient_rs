@@ -532,10 +532,10 @@ impl CalibrationUi {
         }
         if let Some(values) = &state.values {
             if !state.busy {
-                for index in 0..3 {
+                for (index, divisor) in DISPLAY_DIVISORS.iter().enumerate() {
                     self.gains[index] = (values.gains[index] * 1e6).round() / 1e6;
                     self.offsets[index] =
-                        ((values.offsets_ua[index] / DISPLAY_DIVISORS[index]) * 1e6).round() / 1e6;
+                        ((values.offsets_ua[index] / divisor) * 1e6).round() / 1e6;
                 }
             }
         }
