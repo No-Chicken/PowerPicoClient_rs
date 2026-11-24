@@ -4,7 +4,8 @@ PowerPico Client 现在是一个纯 Rust 桌面应用：`powerpico-core` 负责�
 
 ## 依赖
 
-- Rust 1.98 或更新版本（GPUI 快照与 Ely 要求 edition 2024）。
+- Rust 1.98（GPUI 快照与 Ely 要求 edition 2024）。仓库根的 `rust-toolchain.toml` 把工具链固定为
+  `1.98.0` 并带上 `rustfmt`、`clippy`，在该目录第一次执行 `cargo` 时 rustup 会自动安装，无需手动切换。
 - Linux：
   - Wayland 或 X11 会话；
   - `wayland`、`libxkbcommon`、`fontconfig` 开发库；
