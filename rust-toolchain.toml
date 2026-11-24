@@ -1,0 +1,8 @@
+# GPUI, GPUI Kit and Ely all require rustc 1.98, and the workspace pins the
+# same `rust-version`, so keep the toolchain exact instead of floating on
+# `stable`. rustup installs this toolchain (and the two components below) on
+# the first `cargo` command in this directory.
+[toolchain]
+channel = "1.98.0"
+profile = "minimal"
+components = ["rustfmt", "clippy"]
