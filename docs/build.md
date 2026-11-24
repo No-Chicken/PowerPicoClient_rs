@@ -57,12 +57,32 @@ cargo test --workspace
 cargo build --workspace
 ```
 
-## 打包
+## 打包与发布
 
-目前 `cargo build --release` 已经得到可独立运行的二进制，但各平台的安装包（DEB/AppImage、DMG、NSIS）尚未重建。旧的 Tauri 打包脚本与发布工作流已随 Tauri 一并移除；需要时按下面的方向补齐：
+CI/CD 只在推送 `vX.Y.Z` tag 时运行（`.github/workflows/release.yml`）：先在 Ubuntu 24.04 上跑
+格式、clippy 与测试，再构建 release 二进制并打成
+`powerpico-client-<tag>-linux-x86_64.tar.gz`，最后创建或更新对应的 GitHub Release，
+附带 `SHA256SUMS`。手动触发（workflow_dispatch）只构建产物、不发布。
 
-- Linux：`.desktop` 文件 + 图标，AppImage 可用 `linuxdeploy` 打包。
-- macOS：`cargo bundle`/`create-dmg`，并补回签名、公证与图标（`icns`）。
-- Windows：`cargo-wix` 或 NSIS 脚本，补回 `ico` 资源与 Authenticode 签名。
+```bash
+# 版本号需要与 tag 一致（tag 会校验 Cargo.toml 里的版本）
+git tag v0.3.0
+git push origin v0.3.0
+```
 
-应用内更新同样依赖发布产物与更新清单；在重新设计更新通道之前，“发现新版本”只打开 Releases 页面。
+由于检查也只在打 tag 时跑，合并前请本地执行：
+
+```bash
+cargo fmt --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+尚未纳入 tag 流水线的产物：
+
+- Linux AppImage / DEB：需要补 `.desktop`、图标与 `linuxdeploy` 步骤。
+- macOS DMG：需要 `icns`、签名与公证；Ely 对 `gpui-pre-macos` 的 vendor patch 目前只在它自己的
+  workspace 生效，跨仓库构建前要先确认。
+- Windows NSIS / 便携 ZIP：需要 `ico` 资源与 Authenticode 签名。
+
+应用内更新还依赖这些产物与更新清单；在补回打包之前，“发现新版本”只打开 Releases 页面。

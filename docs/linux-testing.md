@@ -1,6 +1,6 @@
 # Linux 测试清单
 
-日常开发和真机调试在 Arch Linux x86_64 / KDE Wayland 上进行；CI 在 Ubuntu 24.04 runner 上执行格式、lint、测试与构建。
+日常开发和真机调试在 Arch Linux x86_64 / KDE Wayland 上进行；CI/CD 只在推送 `vX.Y.Z` tag 时于 Ubuntu 24.04 runner 上执行格式、lint、测试、构建与打包，平时提交前需本地跑下面的检查。
 
 ## 自动检查
 

@@ -15,3 +15,8 @@ opt-level = 1
 
 [profile.dev.package."*"]
 opt-level = 3
+
+[profile.release]
+# Shipped bundles carry no symbols; the release binary drops from tens of
+# megabytes of debuginfo to a distributable size.
+strip = true

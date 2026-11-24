@@ -58,7 +58,8 @@
 
 请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
 
-> 现有 Release 仍由 Tauri 版本构建。GPUI 版本目前通过源码构建，各平台安装包与自动更新正在重新设计，见 [构建与运行](./docs/build.md#打包)。
+> 现有 Release 仍由 Tauri 版本构建。GPUI 版本的流水线只在推送 `vX.Y.Z` tag 时运行，目前产出
+> Linux x86_64 压缩包；DEB/AppImage、DMG 与 NSIS 仍在补齐，见 [构建与运行](./docs/build.md#打包与发布)。
 
 ---
 
@@ -102,6 +103,8 @@ docs/          构建说明、迁移记录、校准与测试记录
 ```
 
 ### 质量检查
+
+CI 只在打 tag 时运行，所以提交前请在本地跑：
 
 ```bash
 cargo fmt --check

@@ -38,7 +38,9 @@ crates/
 ## 已知差异与后续工作
 
 1. **应用内更新**：Tauri updater 已随 Tauri 移除。当前“发现新版本”打开 Releases 页面；重新接入需要一个 GPUI 侧的下载、校验与替换安装包的实现。
-2. **打包与发布**：旧的 DEB/AppImage/DMG/NSIS 流水线已删除，目前只产出可执行文件，见 [构建说明](./build.md#打包)。
+2. **打包与发布**：旧流水线已删除，新的 `release.yml` 只在推送 `vX.Y.Z` tag 时运行，产出
+   Linux x86_64 压缩包并创建 Release；DEB/AppImage、DMG 与 NSIS 仍待补齐，见
+   [构建说明](./build.md#打包与发布)。
 3. **指标拖拽排序**：设置页先提供上移/下移按钮，拖拽排序尚未接入 GPUI 的 drag 机制。
 4. **键盘与无障碍**：Ely 组件自带焦点环与 AccessKit 语义，但页面级快捷键（Esc 关闭读数等）还没补。
 5. **平台验收**：在 Arch Linux / KDE Wayland 上完成了真机采集、校准端口释放与固件页联调；macOS 与 Windows 尚未重新验收。
