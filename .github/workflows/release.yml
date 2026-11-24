@@ -99,9 +99,59 @@ jobs:
           path: dist/*.tar.gz
           if-no-files-found: error
 
+  # Cross-compiled on the same Ubuntu runner, so no Windows machine is needed.
+  # cargo-xwin downloads the MSVC CRT/SDK on first use; the `+crt-static` flag
+  # links the C runtime in, so the exe runs without the VC++ redistributable.
+  windows:
+    name: Package Windows x86_64
+    needs: checks
+    runs-on: ubuntu-24.04
+    env:
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang lld zip
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-xwin
+
+      - name: Install cargo-xwin
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-xwin
+
+      - name: Build
+        run: cargo xwin build --release --target x86_64-pc-windows-msvc -p powerpico-app
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          name="powerpico-client-${tag}-windows-x86_64"
+          mkdir -p "dist/${name}/docs"
+          install -m 755 \
+            target/x86_64-pc-windows-msvc/release/powerpico-client.exe \
+            "dist/${name}/powerpico-client.exe"
+          install -m 644 LICENSE README.md THIRD_PARTY_NOTICES.md "dist/${name}/"
+          cp -r docs/*.md "dist/${name}/docs/"
+          (cd dist && zip -qr "${name}.zip" "${name}")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: dist/*.zip
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub release
-    needs: linux
+    needs: [linux, windows]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     steps:
@@ -112,13 +162,18 @@ jobs:
           name: linux-package
           path: dist
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-package
+          path: dist
+
       - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
-          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
+          (cd dist && sha256sum ./* > SHA256SUMS)
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" dist/* --clobber
           else

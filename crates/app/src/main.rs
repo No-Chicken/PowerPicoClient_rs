@@ -5,13 +5,17 @@
 //! capture, calibration and firmware threads, and this crate draws the same
 //! four screens with GPUI, GPUI Kit and Ely's components.
 
+// A release build launched from Explorer must not open a console window. Debug
+// builds keep the console so `eprintln!` and panics stay visible in a terminal.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod app;
 mod i18n;
 mod model;
 mod pages;
 mod theme;
 
-use gpui::{px, size, AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions};
+use gpui::{AppContext, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size};
 use gpui_kit::App;
 
 use crate::app::PowerPico;

@@ -58,8 +58,9 @@
 
 请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
 
-> 现有 Release 仍由 Tauri 版本构建。GPUI 版本的流水线只在推送 `vX.Y.Z` tag 时运行，目前产出
-> Linux x86_64 压缩包；DEB/AppImage、DMG 与 NSIS 仍在补齐，见 [构建与运行](./docs/build.md#打包与发布)。
+> 现有 Release 仍由 Tauri 版本构建。GPUI 版本的流水线只在推送 `vX.Y.Z` tag 时运行，从下个版本起
+> 在同一台 Ubuntu runner 上产出 Linux x86_64 压缩包与 Windows x86_64 便携 ZIP（交叉编译）；
+> DEB/AppImage 与 DMG 仍在补齐，见 [构建与运行](./docs/build.md#打包与发布)。
 
 ---
 
