@@ -24,3 +24,6 @@ PowerPico_Client
 # 本地助手工作区数据
 .workbuddy/
 outputs/
+
+# 本地打包产物
+dist/

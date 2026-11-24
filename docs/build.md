@@ -61,19 +61,24 @@ cargo build --workspace
 ## 打包与发布
 
 CI/CD 只在推送 `vX.Y.Z` tag 时运行（`.github/workflows/release.yml`）：先在 Ubuntu 24.04 上跑
-格式、clippy 与测试，然后在**同一台 Ubuntu runner** 上构建并打包两个产物，最后创建或更新对应的
-GitHub Release，附带 `SHA256SUMS`：
+格式、clippy 与测试（顺带校验 tag 与 `Cargo.toml` 版本一致），然后由 **macOS runner** 构建
+Apple Silicon 包并创建 GitHub Release：
 
-- `powerpico-client-<tag>-linux-x86_64.tar.gz`（`cargo build --release`）
-- `powerpico-client-<tag>-windows-x86_64.zip`（`cargo xwin` 交叉编译的便携版）
+- `powerpico-client-<tag>-macos-aarch64.tar.gz`（未打包成 `.app`，解压后在终端运行，首次运行
+  需移除隔离属性 `xattr -d com.apple.quarantine`）
 
-手动触发（workflow_dispatch）只构建产物、不发布。
+Linux 与 Windows 的产物在本地构建后上传到同一 Release：
 
 ```bash
-# 版本号需要与 tag 一致（tag 会校验 Cargo.toml 里的版本）
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.4.0
+git push origin v0.4.0
+# 等 CI 发布 macOS 包之后：
+scripts/upload-release.sh v0.4.0
 ```
+
+脚本会构建 Linux x86_64 压缩包（`cargo build --release`）与 Windows x86_64 便携 ZIP
+（`cargo xwin` 交叉编译），下载 Release 里已有的资产重新生成覆盖全量 `SHA256SUMS`，最后
+`gh release upload` 上传。手动触发（workflow_dispatch）只构建 macOS 产物、不发布。
 
 由于检查也只在打 tag 时跑，合并前请本地执行：
 
@@ -85,7 +90,8 @@ cargo test --workspace
 
 ### Windows 交叉编译细节
 
-Windows 版由 `cargo xwin build --target x86_64-pc-windows-msvc` 在 Linux 上产出，本机复现：
+Windows 版由 `cargo xwin build --target x86_64-pc-windows-msvc` 在 Linux 上本地产出（上传脚本
+会自动执行同样的命令），手动复现：
 
 ```bash
 rustup target add x86_64-pc-windows-msvc
@@ -108,11 +114,11 @@ RUSTFLAGS="-C target-feature=+crt-static" \
 另外 `crates/app/src/main.rs` 顶部用 `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]`
 保证 release 版双击运行不弹控制台；debug 版保留控制台以便看日志。
 
-尚未纳入 tag 流水线的产物：
+尚未纳入流水线的产物：
 
 - Linux AppImage / DEB：需要补 `.desktop`、图标与 `linuxdeploy` 步骤。
-- macOS DMG：需要 `icns`、签名与公证；Ely 对 `gpui-pre-macos` 的 vendor patch 目前只在它自己的
-  workspace 生效，跨仓库构建前要先确认。
-- Windows NSIS 安装包：便携 ZIP 已由交叉编译产出，需要安装器时再补 `ico` 资源与 Authenticode 签名。
+- macOS DMG 与 `.app` 包：需要 `icns`、签名与公证；Ely 对 `gpui-pre-macos` 的 vendor patch 目前
+  只在它自己的 workspace 生效，跨仓库构建前要先确认。
+- Windows NSIS 安装包：便携 ZIP 已可产出，需要安装器时再补 `ico` 资源与 Authenticode 签名。
 
 应用内更新还依赖这些产物与更新清单；在补回打包之前，“发现新版本”只打开 Releases 页面。

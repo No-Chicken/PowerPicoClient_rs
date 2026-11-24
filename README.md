@@ -58,9 +58,9 @@
 
 请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
 
-> 从 v0.4.0 起，流水线在同一台 Ubuntu runner 上构建两个产物：Linux x86_64 压缩包与 Windows x86_64
-> 便携 ZIP（交叉编译，C 运行时静态链接，免装 VC++ 运行库）；DEB/AppImage 与 DMG 仍在补齐，
-> 见 [构建与运行](./docs/build.md#打包与发布)。
+> CI 只构建 macOS（Apple Silicon，未打包 `.app`，首次运行需移除隔离属性）。Linux x86_64 压缩包
+> 与 Windows x86_64 便携 ZIP（交叉编译，免装 VC++ 运行库）在本地构建后上传到同一 Release，
+> 步骤见 [构建与运行](./docs/build.md#打包与发布)。
 
 ---
 
