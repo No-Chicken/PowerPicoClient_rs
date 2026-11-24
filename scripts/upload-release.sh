@@ -66,19 +66,20 @@ cp -r docs/*.md "dist/${win_name}/docs/"
 
 # ------------------------------------------------------------------- upload
 echo "== Uploading to ${tag} =="
-# Fetch whatever CI already published so SHA256SUMS covers every asset.
+# Stage the local packages together with whatever CI already published, then
+# generate SHA256SUMS over the complete asset list.
+stage="dist/assets"
 fetch="dist/fetch"
-rm -rf "$fetch"
-mkdir -p "$fetch"
+rm -rf "$stage" "$fetch"
+mkdir -p "$stage" "$fetch"
+cp "dist/${linux_name}.tar.gz" "dist/${win_name}.zip" "$stage/"
 gh release download "$tag" -D "$fetch"
+cp "$fetch"/* "$stage"/
+rm -f "$stage/SHA256SUMS"
 
-(cd "$fetch" && sha256sum ./* > SHA256SUMS)
+(cd "$stage" && sha256sum ./* > SHA256SUMS)
 
-gh release upload "$tag" \
-  "dist/${linux_name}.tar.gz" \
-  "dist/${win_name}.zip" \
-  "$fetch/SHA256SUMS" \
-  --clobber
+gh release upload "$tag" "$stage"/* --clobber
 
 echo "== Done: ${tag} assets =="
 gh release view "$tag" --json assets --jq '.assets[].name'
