@@ -2,7 +2,7 @@
   <h1 align="center">PowerPico Client</h1>
   <p align="center">面向 PowerPico 的跨平台数据采集、波形分析、校准与固件升级客户端</p>
 
-  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.3.0-blue" alt="Version 0.3.0"></a>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.4.0-blue" alt="Version 0.4.0"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
   <img src="https://img.shields.io/badge/GPUI-Rust-DEA584" alt="GPUI">
   <img src="https://img.shields.io/badge/UI-GPUI%20Kit%20%2B%20Ely-246bfd" alt="GPUI Kit and Ely">
@@ -17,7 +17,7 @@
 
 **PowerPico Client** 是使用 Rust 与 [GPUI](https://www.gpui.rs) 实现的 PowerPico 桌面客户端，界面由 [GPUI Kit](https://github.com/longbridge/gpui-kit) 与 [Ely GPUI Component](https://github.com/ELY-Open-Source/Ely-GPUI-Components) 构建，提供高速数据采集、实时波形、精确区间分析、记录导入导出、三档校准、固件升级、缓存管理和客户端更新检查能力。
 
-`GPUI` 分支已把 Tauri 2 + Svelte 前端替换为纯 Rust 实现，渲染走 GPU。迁移细节见 [从 Tauri 到 GPUI](./docs/gpui-migration.md)。
+整个客户端为纯 Rust 实现，GPU 渲染。架构与迁移记录见 [GPUI 迁移说明](./docs/gpui-migration.md)。
 
 <p align="center">
   <a href="https://github.com/No-Chicken/Power-Pico">Power-Pico 主项目</a> |
@@ -58,9 +58,9 @@
 
 请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
 
-> 现有 Release 仍由 Tauri 版本构建。GPUI 版本的流水线只在推送 `vX.Y.Z` tag 时运行，从下个版本起
-> 在同一台 Ubuntu runner 上产出 Linux x86_64 压缩包与 Windows x86_64 便携 ZIP（交叉编译）；
-> DEB/AppImage 与 DMG 仍在补齐，见 [构建与运行](./docs/build.md#打包与发布)。
+> 从 v0.4.0 起，流水线在同一台 Ubuntu runner 上构建两个产物：Linux x86_64 压缩包与 Windows x86_64
+> 便携 ZIP（交叉编译，C 运行时静态链接，免装 VC++ 运行库）；DEB/AppImage 与 DMG 仍在补齐，
+> 见 [构建与运行](./docs/build.md#打包与发布)。
 
 ---
 
@@ -72,12 +72,12 @@
 | :--- | :---: | :---: | :---: |
 | 数据采集与波形 | ✅ | ✅（Arch Linux 真机） | ✅ |
 | 记录导入导出 | ✅ | ✅ | ✅ |
-| 设备固件升级 | ✅ | ⚠️ 待真机验收 | ✅ |
+| 设备固件升级 | ✅ | ✅（Arch Linux 真机） | ✅ |
 | 三档校准 | ✅ | ✅（Arch Linux 真机） | ✅ |
 | 缓存管理 | ✅ | ✅ | ✅ |
 | 客户端更新检查 | ⚠️ 打开 Releases 页面 | ⚠️ 打开 Releases 页面 | ⚠️ 打开 Releases 页面 |
 
-旧版 Tauri 构建的验收记录仍可作为参考：[校准功能与测试记录](./docs/calibration-testing.md)。GPUI 版本已在 Arch Linux / KDE Wayland 的 AMD 显卡、macOS 与 Windows 上完成实时采集、区间分析、记录导入导出、校准串口释放与固件升级检查；逐项清单见 [Linux 测试清单](./docs/linux-testing.md)，其他平台只需替换串口节点与数据目录。
+GPUI 版本已在 Arch Linux / KDE Wayland 的 AMD 显卡、macOS 与 Windows 上完成实时采集、区间分析、记录导入导出、校准串口释放与固件升级检查；逐项清单见 [Linux 测试清单](./docs/linux-testing.md)，其他平台只需替换串口节点与数据目录。
 
 ---
 
@@ -134,7 +134,7 @@ npx skills add longbridge/gpui-kit
 
 ## 📂 数据与网络
 
-设置和官方固件保存在系统应用数据目录，临时采集记录保存在应用缓存目录，日志保存在平台日志目录（与旧版路径一致）。官方固件信息来自 PowerPico 固件服务，客户端更新信息来自本仓库 GitHub Releases。
+设置和官方固件保存在系统应用数据目录，临时采集记录保存在应用缓存目录，日志保存在平台日志目录。官方固件信息来自 PowerPico 固件服务，客户端更新信息来自本仓库 GitHub Releases。
 
 ---
 
