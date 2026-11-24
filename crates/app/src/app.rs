@@ -9,17 +9,17 @@ use ely_gpui_component::{
 };
 use gpui::prelude::*;
 use gpui::{
-    div, ease_in_out, prelude::FluentBuilder, px, Animation, AnimationExt, Context, FocusHandle,
-    FontWeight, IntoElement, ParentElement, Render, SharedString, Styled, Window,
+    Animation, AnimationExt, Context, FocusHandle, FontWeight, IntoElement, ParentElement, Render,
+    SharedString, Styled, Window, div, ease_in_out, prelude::FluentBuilder, px,
 };
 use powerpico_core::{AppPaths, AppSettings, CaptureStatus, ThemeMode};
 
 use crate::{
-    i18n::{t, Lang},
+    i18n::{Lang, t},
     model::{
-        metric_key, metric_tone, metric_tone_color, metric_value, CalibrationOp, CalibrationUi,
-        Command, Confirmation, CoreEvent, Effect, FirmwareUi, Page, SettingsUi, Toast, Tone,
-        WaveformState,
+        CalibrationOp, CalibrationUi, Command, Confirmation, CoreEvent, Effect, FirmwareUi, Page,
+        SettingsUi, Toast, Tone, WaveformState, metric_key, metric_tone, metric_tone_color,
+        metric_value,
     },
     pages, theme as palette,
 };
@@ -139,57 +139,59 @@ impl PowerPico {
         let rx = self.events.clone();
         let core = self.core.clone();
 
-        cx.spawn(async move |this, cx| loop {
-            cx.background_executor()
-                .timer(Duration::from_millis(33))
-                .await;
-
-            let mut events = Vec::new();
-            while let Ok(event) = rx.try_recv() {
-                events.push(event);
-            }
-            let toast_expired = this
-                .update(cx, |app, _| {
-                    app.toast
-                        .as_ref()
-                        .is_some_and(|toast| toast.at.elapsed().as_secs_f32() > 3.5)
-                })
-                .unwrap_or(false);
-
-            if !events.is_empty() {
-                this.update(cx, |app, cx| {
-                    for (name, value) in events {
-                        app.handle_event(name, value);
-                    }
-                    cx.notify();
-                })
-                .ok();
-            }
-            if toast_expired {
-                this.update(cx, |app, cx| {
-                    app.toast = None;
-                    cx.notify();
-                })
-                .ok();
-            }
-
-            let commands = this
-                .update(cx, |app, _| std::mem::take(&mut app.commands))
-                .unwrap_or_default();
-            for command in commands {
-                let core = core.clone();
-                let effect = cx
-                    .background_executor()
-                    .spawn(async move { crate::model::run(command, &core) })
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor()
+                    .timer(Duration::from_millis(33))
                     .await;
-                this.update(cx, |app, cx| {
-                    app.apply(effect);
-                    if app.quit_requested {
-                        cx.quit();
-                    }
-                    cx.notify();
-                })
-                .ok();
+
+                let mut events = Vec::new();
+                while let Ok(event) = rx.try_recv() {
+                    events.push(event);
+                }
+                let toast_expired = this
+                    .update(cx, |app, _| {
+                        app.toast
+                            .as_ref()
+                            .is_some_and(|toast| toast.at.elapsed().as_secs_f32() > 3.5)
+                    })
+                    .unwrap_or(false);
+
+                if !events.is_empty() {
+                    this.update(cx, |app, cx| {
+                        for (name, value) in events {
+                            app.handle_event(name, value);
+                        }
+                        cx.notify();
+                    })
+                    .ok();
+                }
+                if toast_expired {
+                    this.update(cx, |app, cx| {
+                        app.toast = None;
+                        cx.notify();
+                    })
+                    .ok();
+                }
+
+                let commands = this
+                    .update(cx, |app, _| std::mem::take(&mut app.commands))
+                    .unwrap_or_default();
+                for command in commands {
+                    let core = core.clone();
+                    let effect = cx
+                        .background_executor()
+                        .spawn(async move { crate::model::run(command, &core) })
+                        .await;
+                    this.update(cx, |app, cx| {
+                        app.apply(effect);
+                        if app.quit_requested {
+                            cx.quit();
+                        }
+                        cx.notify();
+                    })
+                    .ok();
+                }
             }
         })
         .detach();
@@ -324,18 +326,17 @@ impl PowerPico {
                     // Developer aid: `POWERPICO_AUTOSTART=<device id>` (or `1`
                     // for the first device) starts capture on launch so the chart
                     // can be inspected without a click.
-                    if let Ok(wanted) = std::env::var("POWERPICO_AUTOSTART") {
-                        if self.waveform.capture.status == CaptureStatus::Idle
-                            && !self.waveform.devices.is_empty()
-                        {
-                            let device = if wanted.is_empty() || wanted == "1" {
-                                self.waveform.devices[0].id.clone()
-                            } else {
-                                wanted
-                            };
-                            self.waveform.selected_device = device.clone();
-                            self.commands.push(Command::StartCapture(device));
-                        }
+                    if let Ok(wanted) = std::env::var("POWERPICO_AUTOSTART")
+                        && self.waveform.capture.status == CaptureStatus::Idle
+                        && !self.waveform.devices.is_empty()
+                    {
+                        let device = if wanted.is_empty() || wanted == "1" {
+                            self.waveform.devices[0].id.clone()
+                        } else {
+                            wanted
+                        };
+                        self.waveform.selected_device = device.clone();
+                        self.commands.push(Command::StartCapture(device));
                     }
                 }
                 Err(error) => self.notify(error, Tone::Error),
@@ -352,14 +353,12 @@ impl PowerPico {
             },
             Effect::Plot { start, end, result } => {
                 self.waveform.render_pending = false;
-                if let Ok(series) = result {
-                    if !series.time.is_empty()
-                        || self.waveform.capture.status != CaptureStatus::Capturing
-                    {
-                        self.waveform.latest_end =
-                            self.waveform.latest_end.max(series.available_end);
-                        self.waveform.series = series;
-                    }
+                if let Ok(series) = result
+                    && (!series.time.is_empty()
+                        || self.waveform.capture.status != CaptureStatus::Capturing)
+                {
+                    self.waveform.latest_end = self.waveform.latest_end.max(series.available_end);
+                    self.waveform.series = series;
                 }
                 let _ = (start, end);
                 if self.waveform.render_queued {
@@ -368,10 +367,10 @@ impl PowerPico {
                 }
             }
             Effect::Stats { window, result } => {
-                if let Ok(summary) = result {
-                    if window.is_none() {
-                        self.waveform.summary = summary.clone();
-                    }
+                if let Ok(summary) = result
+                    && window.is_none()
+                {
+                    self.waveform.summary = summary.clone();
                 }
             }
             Effect::Range(result) => match result {

@@ -3,8 +3,8 @@ use std::{
     io::Read,
     path::Path,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -103,7 +103,7 @@ fn wait_for_repeated(
         }
         match port.read(&mut byte) {
             Ok(1) if repeated_byte_seen(byte[0], expected, &mut consecutive, required) => {
-                return Ok(())
+                return Ok(());
             }
             Ok(1) if byte[0] == expected => {}
             Ok(1) => {}

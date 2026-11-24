@@ -10,7 +10,7 @@ use powerpico_core::{
     RangeStatistics, RenderSeries, SerialDevice, StorageUsage, UninstallInfo, ZeroStatistics,
 };
 
-use crate::i18n::{t, Lang};
+use crate::i18n::{Lang, t};
 
 /// One of the four screens in the sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -530,13 +530,12 @@ impl CalibrationUi {
         if let Some(id) = &state.device_id {
             self.selected_device = id.clone();
         }
-        if let Some(values) = &state.values {
-            if !state.busy {
-                for (index, divisor) in DISPLAY_DIVISORS.iter().enumerate() {
-                    self.gains[index] = (values.gains[index] * 1e6).round() / 1e6;
-                    self.offsets[index] =
-                        ((values.offsets_ua[index] / divisor) * 1e6).round() / 1e6;
-                }
+        if let Some(values) = &state.values
+            && !state.busy
+        {
+            for (index, divisor) in DISPLAY_DIVISORS.iter().enumerate() {
+                self.gains[index] = (values.gains[index] * 1e6).round() / 1e6;
+                self.offsets[index] = ((values.offsets_ua[index] / divisor) * 1e6).round() / 1e6;
             }
         }
         self.state = state;

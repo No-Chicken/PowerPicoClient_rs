@@ -76,14 +76,14 @@ fn select_rediscovered_device(
     previous_paths: &[String],
     devices: &[SerialDevice],
 ) -> Option<SerialDevice> {
-    if let Some(serial) = &original.serial_number {
-        if let Some(device) = select_unique(
+    if let Some(serial) = &original.serial_number
+        && let Some(device) = select_unique(
             devices
                 .iter()
                 .filter(|device| device.serial_number.as_ref() == Some(serial)),
-        ) {
-            return Some(device);
-        }
+        )
+    {
+        return Some(device);
     }
 
     let new_usb_devices: Vec<_> = devices

@@ -10,8 +10,8 @@ use std::{
     collections::VecDeque,
     io::{Read, Write},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     thread,
     time::{Duration, Instant},
@@ -280,7 +280,9 @@ impl<P: Read + Write> Protocol<P> {
                 }
             }
         }
-        Err(CoreError::Timeout(format!("waiting for calibration command 0x{command:02x}; check firmware support and connection")))
+        Err(CoreError::Timeout(format!(
+            "waiting for calibration command 0x{command:02x}; check firmware support and connection"
+        )))
     }
     pub fn read_values(&mut self) -> CoreResult<Values> {
         Values::decode(&self.transact(GET, &[])?)
@@ -356,7 +358,9 @@ impl<P: Read + Write> Protocol<P> {
                         let current = u16::from_le_bytes([s[3], s[4]]);
                         let reference = u16::from_le_bytes([s[5], s[6]]);
                         if !(1998..=2098).contains(&reference) || !(16..=4079).contains(&current) {
-                            return Err(problem(format!("Range {range}: invalid ADC current={current}, reference={reference}; check wiring and disconnect the load.")));
+                            return Err(problem(format!(
+                                "Range {range}: invalid ADC current={current}, reference={reference}; check wiring and disconnect the load."
+                            )));
                         }
                         samples.push(current as i32 - reference as i32);
                         if samples.len() == SAMPLE_COUNT {
@@ -495,7 +499,9 @@ fn estimate_zero(samples: &[i32], range: u8) -> CoreResult<ZeroStatistics> {
     let zero = (blocks[9] + blocks[10]) / 2.;
     tracing::info!(range, zero, noise, mean, "zero calibration statistics");
     if noise > 5. || zero.abs() > 32. {
-        return Err(problem(format!("Range {range}: zero={zero:.6} LSB (limit ±32), noise={noise:.6} LSB (limit 5). Disconnect the load and check wiring/interference.")));
+        return Err(problem(format!(
+            "Range {range}: zero={zero:.6} LSB (limit ±32), noise={noise:.6} LSB (limit 5). Disconnect the load and check wiring/interference."
+        )));
     }
     Ok(ZeroStatistics {
         range,

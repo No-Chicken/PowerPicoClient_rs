@@ -1,6 +1,6 @@
 use ely_gpui_component::buttons::Button;
 use gpui::prelude::*;
-use gpui::{div, px, App, AppContext, Context, IntoElement, Render, Window, WindowOptions};
+use gpui::{App, AppContext, Context, IntoElement, Render, Window, WindowOptions, div, px};
 
 struct Hello;
 

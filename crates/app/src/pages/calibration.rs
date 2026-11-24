@@ -9,13 +9,13 @@ use ely_gpui_component::{
     theme::{ActiveTheme, ControlSize, IconSize},
 };
 use gpui::prelude::*;
-use gpui::{div, px, Context, IntoElement, ParentElement, SharedString, Styled, Window};
+use gpui::{Context, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 
 use crate::{
-    app::{field, page_header, panel, PowerPico},
+    app::{PowerPico, field, page_header, panel},
     model::{
-        offset_limit, valid_calibration, CalibrationOp, Command, Confirmation, ManualWrite,
-        CALIBRATION_SCALES, DISPLAY_DIVISORS,
+        CALIBRATION_SCALES, CalibrationOp, Command, Confirmation, DISPLAY_DIVISORS, ManualWrite,
+        offset_limit, valid_calibration,
     },
 };
 

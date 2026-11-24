@@ -1,5 +1,5 @@
 use crate::{
-    calibration::{Frame, MixedParser, Values, SCALES},
+    calibration::{Frame, MixedParser, SCALES, Values},
     types::Sample,
 };
 

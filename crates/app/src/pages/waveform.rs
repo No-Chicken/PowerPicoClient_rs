@@ -9,15 +9,15 @@ use ely_gpui_component::{
 };
 use gpui::prelude::*;
 use gpui::{
-    canvas, div, fill, point, px, size, App, Bounds, Context, Hsla, IntoElement, MouseButton,
-    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, PathBuilder, Pixels, Point,
-    ScrollDelta, ScrollEvent, SharedString, Styled, Window,
+    App, Bounds, Context, Hsla, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, ParentElement, PathBuilder, Pixels, Point, ScrollDelta, ScrollEvent,
+    SharedString, Styled, Window, canvas, div, fill, point, px, size,
 };
 use powerpico_core::{CaptureStatus, PointReading, RenderSeries};
 
 use crate::{
-    app::{metric_card, page_header, panel, PowerPico},
-    model::{count, format_current, format_power, ChartTarget, Command, DragState, Range, Tone},
+    app::{PowerPico, metric_card, page_header, panel},
+    model::{ChartTarget, Command, DragState, Range, Tone, count, format_current, format_power},
     theme as palette,
 };
 
@@ -723,11 +723,16 @@ fn reading_card(
 
 /// The painted chart. The canvas fills the plot area alone, so a pointer
 /// position maps straight into data space through the bounds reported here.
+///
+/// The element owns everything it draws (both closures capture clones), so it
+/// deliberately captures no lifetimes from `app` or `colors`. Edition 2024
+/// would otherwise hold the `&mut PowerPico` borrow for the caller's whole
+/// render body.
 fn chart(
     app: &mut PowerPico,
     colors: &ely_gpui_component::theme::Palette,
     cx: &mut Context<PowerPico>,
-) -> impl IntoElement {
+) -> impl IntoElement + use<> {
     let dark = cx.theme().is_dark();
     let mode = if dark {
         ely_gpui_component::theme::Mode::Dark
@@ -1129,13 +1134,15 @@ impl PowerPico {
         let Some(drag) = self.chart_drag.take() else {
             return;
         };
+        if drag.analysis
+            && drag.dragged
+            && let Some(draft) = self.waveform.analysis_draft
+            && draft.span() > 0.0001
+        {
+            self.queue(Command::AnalyzeRange(draft.min, draft.max));
+            self.waveform.follow_live = false;
+        }
         if drag.analysis && drag.dragged {
-            if let Some(draft) = self.waveform.analysis_draft {
-                if draft.span() > 0.0001 {
-                    self.queue(Command::AnalyzeRange(draft.min, draft.max));
-                    self.waveform.follow_live = false;
-                }
-            }
             return;
         }
         if drag.dragged || !drag.started_in_plot {

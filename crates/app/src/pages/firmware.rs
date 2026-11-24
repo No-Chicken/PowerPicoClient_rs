@@ -7,11 +7,11 @@ use ely_gpui_component::{
     primitives::{Icon, IconName},
     theme::{ActiveTheme, ControlSize, IconSize},
 };
-use gpui::{div, px, Context, IntoElement, ParentElement, SharedString, Styled, Window};
+use gpui::{Context, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 use powerpico_core::FirmwareMode;
 
 use crate::{
-    app::{field, page_header, panel, PowerPico},
+    app::{PowerPico, field, page_header, panel},
     model::{Command, Tone},
 };
 

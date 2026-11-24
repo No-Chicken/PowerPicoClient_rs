@@ -2,8 +2,8 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     thread::{self, JoinHandle},
     time::{Duration, Instant},
@@ -264,10 +264,10 @@ impl CaptureManager {
         if self.is_running() {
             return Err(CoreError::DeviceBusy);
         }
-        if let Some(path) = self.record_path.write().take() {
-            if path.starts_with(records_dir) {
-                storage::clear_record_family(&path)?;
-            }
+        if let Some(path) = self.record_path.write().take()
+            && path.starts_with(records_dir)
+        {
+            storage::clear_record_family(&path)?;
         }
         *self.summary.write() = CaptureSummary::default();
         *self.state.write() = CaptureState::default();

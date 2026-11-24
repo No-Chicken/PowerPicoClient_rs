@@ -7,9 +7,9 @@ use std::{
 use std::process::Command;
 
 use crate::{
+    BUNDLE_ID,
     error::{CoreError, CoreResult},
     types::{StorageUsage, UninstallInfo},
-    BUNDLE_ID,
 };
 
 #[cfg(target_os = "macos")]

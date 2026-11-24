@@ -7,13 +7,13 @@ use ely_gpui_component::{
     theme::{ActiveTheme, ControlSize, IconSize},
 };
 use gpui::prelude::*;
-use gpui::{div, px, Context, IntoElement, ParentElement, SharedString, Styled, Window};
+use gpui::{Context, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 use powerpico_core::{Language, MetricId, ThemeMode};
 
 use crate::{
-    app::{page_header, panel, PowerPico},
+    app::{PowerPico, page_header, panel},
     model::{
-        count, format_bytes, metric_key, Command, Confirmation, DEFAULT_METRICS, METRIC_CATALOG,
+        Command, Confirmation, DEFAULT_METRICS, METRIC_CATALOG, count, format_bytes, metric_key,
     },
 };
 
@@ -348,40 +348,43 @@ pub fn page(
             )
             .into_any_element(),
     )];
-    if let Some(info) = app.settings_ui.uninstall.clone() {
-        if info.supported {
-            storage_rows.push(
-                setting_row(
-                    &colors,
-                    IconName::Trash2,
-                    app.tr("settings.uninstall"),
-                    Some(
-                        format!(
-                            "{} · {}",
-                            app.tr("settings.uninstallHint"),
-                            format_bytes(info.total_bytes)
-                        )
-                        .into(),
-                    ),
-                    Button::new("uninstall", app.tr("settings.uninstall"))
-                        .variant(ButtonVariant::Danger)
-                        .size(ControlSize::Sm)
-                        .disabled(app.settings_ui.uninstalling)
-                        .on_click({
-                            let this = this.clone();
-                            move |_, _, cx| {
-                                this.update(cx, |app, cx| {
-                                    app.confirm(Confirmation::Uninstall);
-                                    cx.notify();
-                                })
-                                .ok();
-                            }
-                        })
-                        .into_any_element(),
-                )
-                .text_color(colors.danger),
-            );
-        }
+    if let Some(info) = app
+        .settings_ui
+        .uninstall
+        .clone()
+        .filter(|info| info.supported)
+    {
+        storage_rows.push(
+            setting_row(
+                &colors,
+                IconName::Trash2,
+                app.tr("settings.uninstall"),
+                Some(
+                    format!(
+                        "{} · {}",
+                        app.tr("settings.uninstallHint"),
+                        format_bytes(info.total_bytes)
+                    )
+                    .into(),
+                ),
+                Button::new("uninstall", app.tr("settings.uninstall"))
+                    .variant(ButtonVariant::Danger)
+                    .size(ControlSize::Sm)
+                    .disabled(app.settings_ui.uninstalling)
+                    .on_click({
+                        let this = this.clone();
+                        move |_, _, cx| {
+                            this.update(cx, |app, cx| {
+                                app.confirm(Confirmation::Uninstall);
+                                cx.notify();
+                            })
+                            .ok();
+                        }
+                    })
+                    .into_any_element(),
+            )
+            .text_color(colors.danger),
+        );
     }
     let storage = group(
         &colors,

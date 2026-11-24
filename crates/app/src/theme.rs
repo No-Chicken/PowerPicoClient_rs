@@ -6,7 +6,7 @@
 //! for every component to follow.
 
 use ely_gpui_component::theme::{Mode, Palette, Theme};
-use gpui::{rgb, rgba, App, Hsla};
+use gpui::{App, Hsla, rgb, rgba};
 
 fn color(hex: u32) -> Hsla {
     rgb(hex).into()
