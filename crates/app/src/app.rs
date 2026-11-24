@@ -286,6 +286,10 @@ impl PowerPico {
                 match stage.as_str() {
                     "completed" => {
                         self.notify(self.tr("firmware.downloadCompleted"), Tone::Success);
+                        // The download thread persisted the version; reload the
+                        // copy the view reads so "already current" holds without
+                        // downloading the same image again.
+                        self.settings = self.core.settings();
                         self.commands.push(Command::FetchFirmwareInfo);
                     }
                     "cancelled" => self.notify(self.tr("firmware.downloadCancelled"), Tone::Info),

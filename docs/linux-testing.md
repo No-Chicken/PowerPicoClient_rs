@@ -48,6 +48,21 @@ POWERPICO_AUTOSTART=1 cargo run -p powerpico-app
 - 自定义 BIN 通过 GTK 文件对话框选择。
 - 刷写时设备重新枚举，进度条推进，完成后弹出成功提示；取消后设备回到正常模式。
 
+### 无窗口自检
+
+`crates/app/examples/firmware.rs` 复用与界面相同的 core 路径，可在没有点击的情况下验证
+设备已进入 Bootloader 的场景：
+
+```bash
+cargo run -p powerpico-app --example firmware -- list
+cargo run -p powerpico-app --example firmware -- download
+cargo run -p powerpico-app --example firmware -- flash ~/.local/share/com.openfeasttech.powerpico-client/PowerPico_Firmware.bin
+cargo run -p powerpico-app --example firmware -- probe 3
+```
+
+`flash` 会打印 connecting / rebooting / searchingBootloader / handshaking / uploading / finishing
+各阶段与百分比；`probe` 采集 3 秒并输出点数、时长与最新电压电流，用来确认新固件已启动。
+
 ## 日志
 
 ```bash
