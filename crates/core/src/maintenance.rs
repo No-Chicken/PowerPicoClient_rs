@@ -9,9 +9,9 @@ use std::process::Command;
 use crate::{
     error::{CoreError, CoreResult},
     types::{StorageUsage, UninstallInfo},
+    BUNDLE_ID,
 };
 
-pub const BUNDLE_ID: &str = "com.openfeasttech.powerpico-client";
 #[cfg(target_os = "macos")]
 const APP_NAME: &str = "PowerPico Client.app";
 
