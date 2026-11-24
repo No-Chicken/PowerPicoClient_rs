@@ -70,3 +70,18 @@ tail -f ~/.local/share/com.openfeasttech.powerpico-client/logs/powerpico.log.$(d
 ```
 
 采集、校准、刷写与网络错误都应留下记录，且不包含采样数据本身。
+
+## 其他平台
+
+上面的清单按 Arch Linux 写，macOS 与 Windows 只需替换下面几处，其余步骤一致：
+
+| | macOS | Windows |
+| :--- | :--- | :--- |
+| 串口节点 | `/dev/cu.usbmodem*`（优先于 `/dev/tty.*`） | `COMx` |
+| 应用数据 | `~/Library/Application Support/com.openfeasttech.powerpico-client` | `%APPDATA%\com.openfeasttech.powerpico-client` |
+| 日志 | `~/Library/Logs/com.openfeasttech.powerpico-client/powerpico.log.<日期>` | `%LOCALAPPDATA%\com.openfeasttech.powerpico-client\logs` |
+| 文件对话框 | 原生 NSOpenPanel | 原生 IFileDialog |
+| 卸载 | 仅打包成 `.app` 后可用，`cargo run` 会提示不支持 | 不支持 |
+
+两个平台的构建依赖（Xcode 命令行工具 / MSVC 工具链）见 [构建与运行](./build.md)。macOS 上没有 `.app`
+包时 `cargo run -p powerpico-app` 就是被测应用，`target/debug/powerpico-client` 是同一个进程，别同时开两份。

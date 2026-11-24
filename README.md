@@ -69,14 +69,14 @@
 
 | 功能 | macOS 11+ / Apple Silicon | Ubuntu / Debian / x86_64 | Windows / x86_64 |
 | :--- | :---: | :---: | :---: |
-| 数据采集与波形 | ⚠️ 待 GPUI 版验收 | ✅（Arch Linux 真机） | ⚠️ 待 GPUI 版验收 |
-| 记录导入导出 | ⚠️ 待 GPUI 版验收 | ✅ | ⚠️ 待 GPUI 版验收 |
-| 设备固件升级 | ⚠️ 待 GPUI 版验收 | ⚠️ 待真机验收 | ⚠️ 待 GPUI 版验收 |
-| 三档校准 | ⚠️ 待真机验收 | ✅（Arch Linux 真机） | ⚠️ 待真机验收 |
-| 缓存管理 | ⚠️ 待 GPUI 版验收 | ✅ | ⚠️ 待 GPUI 版验收 |
+| 数据采集与波形 | ✅ | ✅（Arch Linux 真机） | ✅ |
+| 记录导入导出 | ✅ | ✅ | ✅ |
+| 设备固件升级 | ✅ | ⚠️ 待真机验收 | ✅ |
+| 三档校准 | ✅ | ✅（Arch Linux 真机） | ✅ |
+| 缓存管理 | ✅ | ✅ | ✅ |
 | 客户端更新检查 | ⚠️ 打开 Releases 页面 | ⚠️ 打开 Releases 页面 | ⚠️ 打开 Releases 页面 |
 
-旧版 Tauri 构建的验收记录仍可作为参考：[校准功能与测试记录](./docs/calibration-testing.md)。GPUI 版本在 Arch Linux / KDE Wayland 的 AMD 显卡上完成了实时采集、区间分析、固件页联调与校准串口释放检查；macOS 与 Windows 需要重新跑一遍。
+旧版 Tauri 构建的验收记录仍可作为参考：[校准功能与测试记录](./docs/calibration-testing.md)。GPUI 版本已在 Arch Linux / KDE Wayland 的 AMD 显卡、macOS 与 Windows 上完成实时采集、区间分析、记录导入导出、校准串口释放与固件升级检查；逐项清单见 [Linux 测试清单](./docs/linux-testing.md)，其他平台只需替换串口节点与数据目录。
 
 ---
 

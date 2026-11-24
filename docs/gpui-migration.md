@@ -1,6 +1,6 @@
 # 从 Tauri 2 迁移到 GPUI
 
-`GPUI` 分支把 Tauri 2 + Svelte 5 的前端整体换成 Rust + GPUI，界面由 [GPUI Kit](https://github.com/longbridge/gpui-kit) 提供行为与组件，视觉与布局遵循 [Ely GPUI Component](https://github.com/ELY-Open-Source/Ely-GPUI-Components) 的组件体系，并沿用旧版客户端的配色、尺寸与信息层级。
+`main` 分支把 Tauri 2 + Svelte 5 的前端整体换成了 Rust + GPUI，界面由 [GPUI Kit](https://github.com/longbridge/gpui-kit) 提供行为与组件，视觉与布局遵循 [Ely GPUI Component](https://github.com/ELY-Open-Source/Ely-GPUI-Components) 的组件体系，并沿用旧版客户端的配色、尺寸与信息层级。旧版实现保留在 `tauri2-archive` 分支。
 
 ## 仓库结构
 
@@ -43,7 +43,9 @@ crates/
    [构建说明](./build.md#打包与发布)。
 3. **指标拖拽排序**：设置页先提供上移/下移按钮，拖拽排序尚未接入 GPUI 的 drag 机制。
 4. **键盘与无障碍**：Ely 组件自带焦点环与 AccessKit 语义，但页面级快捷键（Esc 关闭读数等）还没补。
-5. **平台验收**：在 Arch Linux / KDE Wayland 上完成了真机采集、校准端口释放与固件页联调；macOS 与 Windows 尚未重新验收。
+5. **平台验收**：在 Arch Linux / KDE Wayland 上完成了真机采集、校准端口释放与固件页联调；macOS
+   与 Windows 也已完成同样的真机验收，因此仓库根的 `rust-toolchain.toml` 把工具链精确固定在
+   `1.98.0`——两个平台的 GPUI 依赖都要求这个版本，浮动在 `stable` 上会随发布漂移。
 
 ## 使用 AI 编码助手的技能
 
