@@ -2,7 +2,7 @@
   <h1 align="center">PowerPico Client</h1>
   <p align="center">面向 PowerPico 的跨平台数据采集、波形分析、校准与固件升级客户端</p>
 
-  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.4.0-blue" alt="Version 0.4.0"></a>
+  <a href="https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest"><img src="https://img.shields.io/badge/Version-0.4.1-blue" alt="Version 0.4.1"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-green" alt="GPLv3"></a>
   <img src="https://img.shields.io/badge/GPUI-Rust-DEA584" alt="GPUI">
   <img src="https://img.shields.io/badge/UI-GPUI%20Kit%20%2B%20Ely-246bfd" alt="GPUI Kit and Ely">
@@ -58,9 +58,8 @@
 
 请从 [GitHub Releases](https://github.com/No-Chicken/PowerPicoClient_rs/releases/latest) 下载对应平台的安装包，并使用同一 Release 中的 `SHA256SUMS` 校验文件完整性。
 
-> CI 只构建 macOS（Apple Silicon，未打包 `.app`，首次运行需移除隔离属性）。Linux x86_64 压缩包
-> 与 Windows x86_64 便携 ZIP（交叉编译，免装 VC++ 运行库）在本地构建后上传到同一 Release，
-> 步骤见 [构建与运行](./docs/build.md#打包与发布)。
+> 推送 `vX.Y.Z` tag 后，GitHub Actions 会在原生 Linux、Windows 和 macOS runner 上分别编译，
+> 并把三个平台的便携包上传到同一 Release。步骤见 [构建与运行](./docs/build.md#打包与发布)。
 
 ---
 
@@ -105,7 +104,7 @@ docs/          构建说明、迁移记录、校准与测试记录
 
 ### 质量检查
 
-CI 只在打 tag 时运行，所以提交前请在本地跑：
+提交前请在本地跑：
 
 ```bash
 cargo fmt --check

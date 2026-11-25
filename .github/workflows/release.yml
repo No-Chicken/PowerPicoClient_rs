@@ -1,7 +1,5 @@
-# Everything runs on tags only: pushing `vX.Y.Z` checks the workspace, builds
-# and publishes the macOS package. The Linux and Windows packages are built
-# locally (`scripts/upload-release.sh`) and uploaded to the same release.
-# A manual run builds the macOS artifact but never publishes.
+# A tag build compiles the application on the native runner for each supported
+# desktop platform, packages the results, and publishes one GitHub Release.
 name: Release
 
 on:
@@ -14,9 +12,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  # Keep in sync with rust-toolchain.toml: the action needs the channel spelled
-  # out, but cargo itself always follows the repository pin.
   RUST_TOOLCHAIN: "1.98.0"
+  # Manual runs still produce inspectable artifacts without creating a release.
+  ARTIFACT_LABEL: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('manual-{0}', github.run_number) }}
 
 jobs:
   checks:
@@ -25,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install GPUI system dependencies
+      - name: Install Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -44,7 +42,7 @@ jobs:
       - name: Check the tag matches the crate version
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          version=$(cargo metadata --no-deps --format-version 1 \
+          version=$(cargo metadata --locked --no-deps --format-version 1 \
             | jq -r '.packages[] | select(.name == "powerpico-app") | .version')
           if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
             echo "tag ${GITHUB_REF_NAME} does not match powerpico-app ${version}" >&2
@@ -55,10 +53,103 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
+
+  linux:
+    name: Package Linux x86_64
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libfontconfig1-dev libgtk-3-dev libx11-xcb-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: linux-x86_64
+
+      - name: Build
+        run: cargo build --release --locked -p powerpico-app
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          name="powerpico-client-${ARTIFACT_LABEL}-linux-x86_64"
+          mkdir -p "dist/${name}/docs"
+          install -m 755 target/release/powerpico-client "dist/${name}/powerpico-client"
+          install -m 644 LICENSE README.md THIRD_PARTY_NOTICES.md "dist/${name}/"
+          cp -r docs/*.md "dist/${name}/docs/"
+          tar -C dist -czf "dist/${name}.tar.gz" "${name}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-package
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  windows:
+    name: Package Windows x86_64
+    needs: checks
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-x86_64
+
+      - name: Locate Windows shader compiler
+        shell: pwsh
+        run: |
+          $fxc = Get-ChildItem `
+            -Path "${env:ProgramFiles(x86)}\Windows Kits\10\bin" `
+            -Filter fxc.exe -File -Recurse -ErrorAction SilentlyContinue `
+            | Where-Object { $_.FullName -match '\\x64\\fxc\.exe$' } `
+            | Sort-Object FullName `
+            | Select-Object -Last 1
+          if ($null -eq $fxc) {
+            throw 'fxc.exe was not found in the installed Windows SDK'
+          }
+          "GPUI_FXC_PATH=$($fxc.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Using $($fxc.FullName)"
+
+      - name: Build
+        run: cargo build --release --locked -p powerpico-app
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $name = "powerpico-client-$env:ARTIFACT_LABEL-windows-x86_64"
+          $root = "dist/$name"
+          New-Item -ItemType Directory -Force -Path "$root/docs" | Out-Null
+          Copy-Item target/release/powerpico-client.exe "$root/powerpico-client.exe"
+          Copy-Item LICENSE, README.md, THIRD_PARTY_NOTICES.md $root
+          Get-ChildItem docs -Filter '*.md' | Copy-Item -Destination "$root/docs"
+          Compress-Archive -Path $root -DestinationPath "dist/$name.zip" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: dist/*.zip
+          if-no-files-found: error
 
   macos:
     name: Package macOS aarch64
@@ -70,18 +161,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           key: macos-aarch64
 
       - name: Build
-        run: cargo build --release -p powerpico-app
+        run: cargo build --release --locked -p powerpico-app
 
       - name: Package
         run: |
           set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          name="powerpico-client-${tag}-macos-aarch64"
+          name="powerpico-client-${ARTIFACT_LABEL}-macos-aarch64"
           mkdir -p "dist/${name}/docs"
           install -m 755 target/release/powerpico-client "dist/${name}/powerpico-client"
           install -m 644 LICENSE README.md THIRD_PARTY_NOTICES.md "dist/${name}/"
@@ -96,7 +187,7 @@ jobs:
 
   publish:
     name: Publish GitHub release
-    needs: macos
+    needs: [linux, windows, macos]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-24.04
     steps:
@@ -104,8 +195,24 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          name: linux-package
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-package
+          path: dist
+
+      - uses: actions/download-artifact@v4
+        with:
           name: macos-package
           path: dist
+
+      - name: Create checksums
+        run: |
+          set -euo pipefail
+          rm -f dist/SHA256SUMS
+          (cd dist && sha256sum ./* > SHA256SUMS)
 
       - name: Create or update the release
         env:

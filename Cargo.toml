@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/core", "crates/app"]
 
 [workspace.package]
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 license = "GPL-3.0-only"
 repository = "https://github.com/No-Chicken/PowerPicoClient_rs"
@@ -19,16 +19,3 @@ opt-level = 3
 # Shipped bundles carry no symbols; the release binary drops from tens of
 # megabytes of debuginfo to a distributable size.
 strip = true
-
-# gpui-pre-windows compiles its HLSL with fxc.exe in its build script, but that
-# script checks `cfg(target_os = "windows")` — the *host*, not the target — so a
-# Linux (or CI Ubuntu) cross build skips it and the crate then fails to find its
-# generated shader bytes. Turning debug assertions on for this one crate selects
-# its `cfg(debug_assertions)` path instead: the eight small shaders compile once
-# at startup through the system `d3dcompiler_47.dll` (Windows 8.1+ ships it), and
-# fxc is no longer needed anywhere. `overflow-checks` is pinned back off so the
-# rest of the crate keeps release semantics; only the shader path changes.
-# If Ely/GPUI later fixes the build script (CARGO_CFG_TARGET_OS), remove this.
-[profile.release.package.gpui-pre-windows]
-debug-assertions = true
-overflow-checks = false
